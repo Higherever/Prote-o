@@ -77,6 +77,8 @@ table inet filter {
         ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit, nd-router-advert, nd-neighbor-advert } accept
         udp dport 68 accept
         udp dport 546 accept
+        tcp dport { 80, 443, 1119, 3724, 4000, 5040, 6113-6115 } accept
+        udp dport { 3478-3479, 5060, 5062, 6250, 12000-64000 } accept
         limit rate 5/minute log prefix "[nftables-BLOCKED] " drop
     }
     chain forward {
@@ -89,7 +91,7 @@ table inet filter {
 NFTABLES
 sudo systemctl enable --now nftables
 sudo nft -f /etc/nftables.conf
-echo -e "${GREEN}✔ Firewall nftables ativo${NC}"
+echo -e "${GREEN}✔ Firewall nftables ativo (com portas Blizzard)${NC}"
 echo -e "${YELLOW}[4/5]${NC} Instalando Fail2Ban..."
 sudo pacman -S --noconfirm --needed fail2ban
 sudo tee /etc/fail2ban/jail.local > /dev/null << 'FAIL2BAN'
