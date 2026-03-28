@@ -29,16 +29,6 @@ chmod +x instalar.sh
 bash instalar.sh
 ```
 
-## Portas liberadas no firewall
-
-### Steam
-- TCP: 27015-27050
-- UDP: 27000-27100, 4380
-
-### Battle.net / Overwatch 2
-- TCP: 80, 443, 1119, 3074, 3724, 4000, 5040, 5222, 6113-6115
-- UDP: 3478-3479, 4379-4380, 5060, 5062, 6250, 12000-64000
-
 ## Verificar após instalar
 
 - https://whoer.net
