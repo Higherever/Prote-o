@@ -11,7 +11,7 @@ Script de proteção completa para CachyOS Linux, **compatível com jogos online
 | **Kernel Hardening** | sysctl seguro com `ptrace_scope=1` | ✅ |
 | **Fail2Ban** | Bloqueia brute-force SSH | ✅ |
 
-## Mudanças da v2 (Gaming Safe)
+## Mudanças da v3 (Gaming Safe)
 
 O script anterior tinha problemas que impediam jogos online:
 
