@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 # ═══════════════════════════════════════════════
 #              CORES
@@ -10,6 +10,219 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+log_info() {
+    echo -e "${CYAN}[INFO]${NC} $*"
+}
+
+log_success() {
+    echo -e "${GREEN}[OK]${NC} $*"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[AVISO]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[ERRO]${NC} $*" >&2
+}
+
+# Modo de execução: dry-run
+DRY_RUN=false
+for __arg in "$@"; do
+    case "${__arg}" in
+        --dry-run|-n)
+            DRY_RUN=true
+            shift || true
+            ;;
+    esac
+done
+if [ "${DRY_RUN}" = true ]; then
+    log_warn "Modo DRY-RUN ativo: nenhuma alteração será aplicada ao sistema."
+fi
+
+# Helpers para dry-run / execução segura
+write_file() {
+    local path="$1"
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: conteúdo que seria escrito em ${path}:"
+        cat -
+        return 0
+    else
+        sudo tee "${path}" > /dev/null
+    fi
+}
+
+run_pacman() {
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: pacman $*"
+        return 0
+    else
+        sudo pacman "$@"
+    fi
+}
+
+run_nft() {
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: nft $*"
+        return 0
+    else
+        sudo nft "$@"
+    fi
+}
+
+run_systemctl() {
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: systemctl $*"
+        return 0
+    else
+        sudo systemctl "$@"
+    fi
+}
+
+backup_file() {
+    local source_path=$1
+    local backup_root=$2
+    local backup_name=$3
+
+    if sudo test -f "$source_path"; then
+        sudo cp -a "$source_path" "$backup_root/$backup_name"
+    else
+        : > "$backup_root/$backup_name.absent"
+    fi
+}
+
+restore_file() {
+    local target_path=$1
+    local backup_root=$2
+    local backup_name=$3
+
+    if [[ -f "$backup_root/$backup_name" ]]; then
+        sudo cp -a "$backup_root/$backup_name" "$target_path"
+    elif [[ -f "$backup_root/$backup_name.absent" ]]; then
+        sudo rm -f "$target_path"
+    fi
+}
+
+save_service_state() {
+    local service_name=$1
+    local backup_root=$2
+    local enabled_state="no"
+    local active_state="no"
+
+    if systemctl is-enabled "$service_name" >/dev/null 2>&1; then
+        enabled_state="yes"
+    fi
+    if systemctl is-active --quiet "$service_name"; then
+        active_state="yes"
+    fi
+
+    printf '%s\n%s\n' "$enabled_state" "$active_state" > "$backup_root/$service_name.state"
+}
+
+restore_service_state() {
+    local service_name=$1
+    local backup_root=$2
+    local state_file="$backup_root/$service_name.state"
+    local enabled_state
+    local active_state
+    local -a service_state
+
+    if [[ ! -f "$state_file" ]]; then
+        return 0
+    fi
+
+    mapfile -t service_state < "$state_file"
+    enabled_state=${service_state[0]:-no}
+    active_state=${service_state[1]:-no}
+
+    if [[ "$enabled_state" == "yes" ]]; then
+        run_systemctl enable "$service_name" >/dev/null 2>&1 || true
+    else
+        run_systemctl disable "$service_name" >/dev/null 2>&1 || true
+    fi
+
+    if [[ "$active_state" == "yes" ]]; then
+        run_systemctl start "$service_name" >/dev/null 2>&1 || true
+    else
+        run_systemctl stop "$service_name" >/dev/null 2>&1 || true
+    fi
+}
+
+backup_security_state() {
+    local backup_root=$1
+
+    backup_file "/etc/sysctl.d/99-hardening.conf" "$backup_root" "99-hardening.conf"
+    backup_file "/etc/nftables.conf" "$backup_root" "nftables.conf"
+    backup_file "/etc/fail2ban/jail.local" "$backup_root" "jail.local"
+    save_service_state "warp-svc" "$backup_root"
+    save_service_state "nftables" "$backup_root"
+    save_service_state "fail2ban" "$backup_root"
+}
+
+restore_security_state() {
+    local backup_root=$1
+
+    log_warn "Restaurando arquivos e serviços de segurança para o estado anterior."
+    restore_file "/etc/sysctl.d/99-hardening.conf" "$backup_root" "99-hardening.conf"
+    restore_file "/etc/nftables.conf" "$backup_root" "nftables.conf"
+    restore_file "/etc/fail2ban/jail.local" "$backup_root" "jail.local"
+
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: sysctl --system (simulação de restauração)."
+    else
+        sudo sysctl --system >/dev/null 2>&1 || true
+    fi
+    if sudo test -f /etc/nftables.conf; then
+        run_nft -f /etc/nftables.conf >/dev/null 2>&1 || true
+    fi
+
+    restore_service_state "warp-svc" "$backup_root"
+    restore_service_state "nftables" "$backup_root"
+    restore_service_state "fail2ban" "$backup_root"
+}
+
+verificar_requisitos_completos() {
+    local command_name
+
+    for command_name in sudo pacman systemctl curl git grep; do
+        if ! command -v "$command_name" &>/dev/null; then
+            log_error "Dependência obrigatória ausente: $command_name"
+            return 1
+        fi
+    done
+
+    garantir_aur_helper || return 1
+}
+
+configuracao_completa() {
+    local backup_root
+    backup_root=$(mktemp -d)
+
+    log_info "Validando pré-requisitos antes da configuração completa."
+    if ! verificar_requisitos_completos; then
+        rm -rf "$backup_root"
+        return 1
+    fi
+
+    backup_security_state "$backup_root"
+
+    if ! instalar_seguranca; then
+        restore_security_state "$backup_root"
+        rm -rf "$backup_root"
+        return 1
+    fi
+
+    if ! instalar_jogos; then
+        log_error "A etapa de jogos falhou após aplicar a etapa de segurança."
+        restore_security_state "$backup_root"
+        rm -rf "$backup_root"
+        return 1
+    fi
+
+    rm -rf "$backup_root"
+    log_success "Configuração completa finalizada sem falhas."
+}
+
 # ═══════════════════════════════════════════════
 #     FUNÇÃO: Garantir paru ou yay disponível
 # ═══════════════════════════════════════════════
@@ -18,30 +231,52 @@ garantir_aur_helper() {
         return 0
     fi
     echo ""
-    echo -e "${YELLOW}Os gerenciadores de pacotes paru e yay não estão instalados.${NC}"
+    log_warn "Os gerenciadores de pacotes paru e yay não estão instalados."
     read -p "Deseja instalar o paru para continuar? (s/n): " resposta
     if [[ "$resposta" =~ ^[Ss]$ ]]; then
-        echo "Instalando paru..."
-        sudo pacman -S --noconfirm --needed base-devel git
+        log_info "Instalando paru pelo AUR."
+        if [ "${DRY_RUN}" = true ]; then
+            log_info "DRY-RUN: pular instalação do paru (simulação)."
+            return 0
+        fi
+        run_pacman -S --noconfirm --needed base-devel git
         local tmpdir
         tmpdir=$(mktemp -d)
         git clone https://aur.archlinux.org/paru.git "$tmpdir/paru"
-        cd "$tmpdir/paru"
-        makepkg -si --noconfirm
-        cd - > /dev/null
+        if [[ ${EUID} -eq 0 ]]; then
+            if [[ -z ${SUDO_USER:-} ]]; then
+                log_error "Execute o script como usuário normal. makepkg não deve rodar como root."
+                rm -rf "$tmpdir"
+                return 1
+            fi
+            sudo -u "$SUDO_USER" bash -lc "cd '$tmpdir/paru' && makepkg -si --noconfirm"
+        else
+            (
+                cd "$tmpdir/paru"
+                makepkg -si --noconfirm
+            )
+        fi
         rm -rf "$tmpdir"
+        log_success "paru instalado com sucesso."
     else
-        echo -e "${RED}Instalação cancelada. Não é possível continuar sem paru ou yay.${NC}"
+        log_error "Instalação cancelada. Não é possível continuar sem paru ou yay."
         return 1
     fi
 }
 
 # Helper: instalar via paru ou yay
 aur_install() {
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: aur_install (simulação): $*"
+        return 0
+    fi
     if command -v paru &>/dev/null; then
         paru -S --noconfirm --needed "$@"
     elif command -v yay &>/dev/null; then
         yay -S --noconfirm --needed "$@"
+    else
+        log_error "Nenhum helper AUR disponível para instalar: $*"
+        return 1
     fi
 }
 
@@ -56,25 +291,57 @@ instalar_seguranca() {
 
     echo ""
     echo -e "${YELLOW}[0/5]${NC} Atualizando sistema..."
-    sudo pacman -Syu --noconfirm
+    log_info "Executando atualização completa do sistema via pacman."
+    run_pacman -Syu --noconfirm
 
     echo ""
     echo -e "${YELLOW}[1/5]${NC} Instalando Cloudflare WARP..."
-    curl -sS https://pkg.cloudflareclient.com/pubkey.gpg | gpg --import 2>/dev/null || true
+    log_info "Verificando presença do warp-cli e do serviço warp-svc."
     if ! command -v warp-cli &>/dev/null; then
         garantir_aur_helper || return 1
         aur_install cloudflare-warp-bin
     fi
-    sudo systemctl enable --now warp-svc
+    if ! command -v warp-cli &>/dev/null; then
+        if [ "${DRY_RUN}" = true ]; then
+            log_info "DRY-RUN: warp-cli não está instalado, simulando instalação em dry-run."
+        else
+            log_error "warp-cli não foi instalado corretamente."
+            return 1
+        fi
+    fi
+    run_systemctl enable --now warp-svc
+    if ! systemctl is-active --quiet warp-svc; then
+        if [ "${DRY_RUN}" = true ]; then
+            log_info "DRY-RUN: serviço warp-svc não iniciado (simulação)."
+        else
+            log_error "O serviço warp-svc não iniciou corretamente."
+            return 1
+        fi
+    fi
     sleep 2
-    warp-cli registration new 2>/dev/null || true
-    warp-cli mode warp 2>/dev/null || true
-    warp-cli connect 2>/dev/null || true
-    echo -e "${GREEN}✔ WARP configurado${NC}"
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: pular comandos 'warp-cli registration/mode/connect' (simulação)."
+    else
+        if ! warp-cli status 2>/dev/null | grep -qi "registration\|registered\|connected"; then
+            log_info "Registrando o cliente WARP neste sistema."
+            warp-cli registration new
+        fi
+        log_info "Aplicando modo WARP e iniciando conexão."
+        warp-cli mode warp
+        warp-cli connect
+        sleep 2
+        if warp-cli status 2>/dev/null | grep -qi "connected"; then
+            log_success "WARP configurado e conectado."
+        else
+            log_error "WARP não confirmou conexão após a configuração."
+            return 1
+        fi
+    fi
 
     echo ""
     echo -e "${YELLOW}[2/5]${NC} Hardening do kernel (compatível com jogos)..."
-    sudo tee /etc/sysctl.d/99-hardening.conf > /dev/null << 'SYSCTL'
+    log_info "Gravando parâmetros sysctl de hardening em /etc/sysctl.d/99-hardening.conf."
+    write_file /etc/sysctl.d/99-hardening.conf > /dev/null << 'SYSCTL'
 net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 net.ipv4.conf.all.log_martians = 1
@@ -103,13 +370,18 @@ kernel.kptr_restrict = 1
 kernel.dmesg_restrict = 1
 kernel.yama.ptrace_scope = 1
 SYSCTL
-    sudo sysctl --system > /dev/null 2>&1
-    echo -e "${GREEN}✔ Kernel hardening aplicado (anti-cheat compatível)${NC}"
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: sysctl --system (simulação)."
+    else
+        sudo sysctl --system > /dev/null 2>&1
+    fi
+    log_success "Kernel hardening aplicado com perfil compatível com jogos."
 
     echo ""
     echo -e "${YELLOW}[3/5]${NC} Configurando firewall nftables (gaming-safe)..."
-    sudo pacman -S --noconfirm --needed nftables
-    sudo tee /etc/nftables.conf > /dev/null << 'NFTABLES'
+    log_info "Instalando nftables e escrevendo a política de firewall."
+    run_pacman -S --noconfirm --needed nftables
+    write_file /etc/nftables.conf > /dev/null << 'NFTABLES'
 #!/usr/sbin/nft -f
 flush ruleset
 table inet filter {
@@ -118,13 +390,12 @@ table inet filter {
         iif "lo" accept
         ct state established,related accept
         ct state invalid drop
-        tcp flags & (fin|syn|rst|psh|ack|urg) == 0x0 drop
-        tcp flags fin,syn / fin,syn drop
-        tcp flags syn,rst / syn,rst drop
-        tcp flags fin,rst / fin,rst drop
-        tcp flags fin,psh,urg / fin,psh,urg drop
+        tcp flags & (fin|syn) == (fin|syn) drop
+        tcp flags & (syn|rst) == (syn|rst) drop
+        tcp flags & (fin|rst) == (fin|rst) drop
+        tcp flags & (fin|psh|urg) == (fin|psh|urg) drop
         tcp flags syn limit rate 50/second burst 100 packets accept
-        tcp flags != syn ct state new drop
+        ct state new tcp flags & (fin|syn|rst|ack) != syn drop
         ip protocol icmp accept
         ip6 nexthdr icmpv6 accept
         udp dport 68 accept
@@ -143,14 +414,19 @@ table inet filter {
     }
 }
 NFTABLES
-    sudo systemctl enable --now nftables
-    sudo nft -f /etc/nftables.conf
-    echo -e "${GREEN}✔ Firewall ativo (Steam + Blizzard liberados)${NC}"
+    if ! run_nft -c -f /etc/nftables.conf; then
+        log_error "A validação do arquivo /etc/nftables.conf falhou."
+        return 1
+    fi
+    run_systemctl enable --now nftables
+    run_nft -f /etc/nftables.conf
+    log_success "Firewall ativo com regras para jogos aplicadas."
 
     echo ""
     echo -e "${YELLOW}[4/5]${NC} Instalando Fail2Ban..."
-    sudo pacman -S --noconfirm --needed fail2ban
-    sudo tee /etc/fail2ban/jail.local > /dev/null << 'FAIL2BAN'
+    log_info "Instalando Fail2Ban e gravando jail.local."
+    run_pacman -S --noconfirm --needed fail2ban
+    write_file /etc/fail2ban/jail.local > /dev/null << 'FAIL2BAN'
 [DEFAULT]
 bantime = 3600
 findtime = 600
@@ -164,11 +440,12 @@ backend = systemd
 maxretry = 3
 bantime = 3600
 FAIL2BAN
-    sudo systemctl enable --now fail2ban
-    echo -e "${GREEN}✔ Fail2Ban ativo${NC}"
+    run_systemctl enable --now fail2ban
+    log_success "Fail2Ban ativo."
 
     echo ""
     echo -e "${YELLOW}[5/5]${NC} Verificando tudo..."
+    log_info "Executando verificações finais de status."
     verificar_status
 }
 
@@ -187,7 +464,8 @@ instalar_jogos() {
 
     echo ""
     echo -e "${YELLOW}[2/3]${NC} Instalando drivers e dependências..."
-    sudo pacman -S --noconfirm --needed \
+    log_info "Instalando pacotes de drivers, Vulkan, Wine e utilitários de jogos."
+    run_pacman -S --noconfirm --needed \
         amd-ucode \
         cachyos-gaming-applications \
         cachyos-gaming-meta \
@@ -217,6 +495,7 @@ instalar_jogos() {
 
     echo ""
     echo -e "${YELLOW}[3/3]${NC} Instalando aplicativos (AUR + repos)..."
+    log_info "Instalando launchers e ferramentas complementares via helper AUR."
     aur_install \
         steam \
         heroic-games-launcher-bin \
@@ -226,13 +505,12 @@ instalar_jogos() {
         wine-cachyos-opt \
         vesktop \
         google-chrome \
-        lact \
         protontricks \
         mangohud \
         goverlay
 
     echo ""
-    echo -e "${GREEN}✔ Instalação de ferramentas e dependências para jogos concluída.${NC}"
+    log_success "Instalação de ferramentas e dependências para jogos concluída."
 }
 
 # ═══════════════════════════════════════════════
@@ -241,7 +519,11 @@ instalar_jogos() {
 verificar_status() {
     echo ""
     echo -e "${CYAN}─── Cloudflare WARP ───${NC}"
-    WARP_STATUS=$(warp-cli status 2>/dev/null | head -5 || echo "Não conectado")
+    if command -v warp-cli &>/dev/null; then
+        WARP_STATUS=$(warp-cli status 2>/dev/null | head -5 || echo "Não conectado")
+    else
+        WARP_STATUS="warp-cli não está instalado"
+    fi
     echo "$WARP_STATUS"
 
     echo ""
@@ -250,26 +532,27 @@ verificar_status() {
     echo -e "IP: ${GREEN}${NOVO_IP}${NC}"
     WARP_CHECK=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | grep "warp=" || echo "warp=off")
     if echo "$WARP_CHECK" | grep -q "warp=on"; then
-        echo -e "${GREEN}✔ WARP ativo — IP real OCULTO${NC}"
+        log_success "WARP ativo e IP real oculto."
     else
-        echo -e "${RED}⚠ WARP não está ativo. Execute: warp-cli connect${NC}"
+        log_warn "WARP não está ativo. Execute: warp-cli connect"
     fi
 
     echo ""
     echo -e "${CYAN}─── Firewall ───${NC}"
-    if sudo nft list ruleset 2>/dev/null | grep -q "policy drop"; then
-        echo -e "${GREEN}✔ Firewall ativo — política DROP${NC}"
+    if sudo nft list table inet filter 2>/dev/null | grep -q "type filter hook input priority 0; policy drop;" \
+        && sudo nft list table inet filter 2>/dev/null | grep -q "type filter hook forward priority 0; policy drop;"; then
+        log_success "Firewall ativo com política DROP em input e forward."
     else
-        echo -e "${RED}⚠ Firewall pode não estar configurado${NC}"
+        log_warn "Firewall pode não estar configurado corretamente."
     fi
 
     echo ""
     echo -e "${CYAN}─── Fail2Ban ───${NC}"
     if systemctl is-active --quiet fail2ban; then
-        echo -e "${GREEN}✔ Fail2Ban ativo${NC}"
+        log_success "Fail2Ban ativo."
         sudo fail2ban-client status sshd 2>/dev/null || true
     else
-        echo -e "${RED}⚠ Fail2Ban não está rodando${NC}"
+        log_warn "Fail2Ban não está rodando."
     fi
 
     echo ""
@@ -327,11 +610,10 @@ case $opcao in
         instalar_jogos
         ;;
     3)
-        instalar_seguranca
-        instalar_jogos
+        configuracao_completa
         ;;
     *)
-        echo -e "${RED}Opção inválida. Saindo...${NC}"
+        log_error "Opção inválida. Saindo..."
         exit 1
         ;;
 esac
