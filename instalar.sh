@@ -69,6 +69,17 @@ log_error() {
     echo -e "${RED}[ERRO]${NC} $*" >&2
 }
 
+# Helper para leitura interativa (restaura temporariamente os descritores originais)
+interactive_read() {
+    local prompt="$1"
+    local -n var_ref=$2
+    # Restaura temporariamente stdout/stderr originais para leitura interativa
+    exec >&3 2>&4
+    read -p "$prompt" var_ref
+    # Restaura redirecionamento para tee
+    exec > >(tee -a "$TEMP_LOG") 2>&1
+}
+
 # Modo de execução: dry-run
 DRY_RUN=false
 for __arg in "$@"; do
@@ -275,7 +286,7 @@ garantir_aur_helper() {
     fi
     echo ""
     log_warn "Os gerenciadores de pacotes paru e yay não estão instalados."
-    read -p "Deseja instalar o paru para continuar? (s/n): " resposta
+    interactive_read "Deseja instalar o paru para continuar? (s/n): " resposta
     if [[ "$resposta" =~ ^[Ss]$ ]]; then
         log_info "Instalando paru pelo AUR."
         if [ "${DRY_RUN}" = true ]; then
@@ -643,7 +654,7 @@ echo "  1) Instalar ferramentas de segurança"
 echo "  2) Instalar ferramentas e dependências para jogos"
 echo "  3) Configuração completa"
 echo ""
-read -p "Digite o número da opção desejada: " opcao
+interactive_read "Digite o número da opção desejada: " opcao
 
 case $opcao in
     1)
