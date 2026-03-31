@@ -80,6 +80,58 @@ interactive_read() {
     exec > >(tee -a "$TEMP_LOG") 2>&1
 }
 
+# Execução segura com captura de saída para análise de erros
+CMD_OUTPUT=""
+CMD_RC=0
+
+# run_cmd: executa um comando (array) com captura de saída
+# parâmetros: descrição (string) + comando e argumentos
+run_cmd() {
+    local desc="$1"
+    shift
+    local -a cmd=("$@")
+    log_info "Executando: ${desc} -> ${cmd[*]}"
+    if [ "${DRY_RUN}" = true ]; then
+        CMD_OUTPUT="DRY-RUN: ${cmd[*]}"
+        CMD_RC=0
+        return 0
+    fi
+    set +e
+    local out
+    out=$("${cmd[@]}" 2>&1)
+    local rc=$?
+    set -e
+    CMD_OUTPUT="$out"
+    CMD_RC=$rc
+    printf '%s
+' "$out"
+    printf '[%s] CMD: %s RC:%d\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${cmd[*]}" "$rc" >> "$TEMP_LOG"
+    if [ $rc -ne 0 ]; then
+        printf '[%s] ERRO: %s\nSaída:\n%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$desc" "$out" >> "$TEMP_LOG"
+    fi
+    return $rc
+}
+
+# Lista simples de conflitos conhecidos (remover antes de instalar a versão oficial)
+resolve_known_conflicts() {
+    local -a known=(lib32-mesa-git)
+    for pkg in "${known[@]}"; do
+        if pacman -Q "$pkg" &>/dev/null; then
+            log_warn "Pacote conflitante detectado instalado: $pkg — removendo automaticamente para evitar conflito."
+            if [ "${DRY_RUN}" = true ]; then
+                log_info "DRY-RUN: sudo pacman -R --noconfirm $pkg"
+            else
+                run_cmd "remover $pkg" sudo pacman -R --noconfirm "$pkg"
+                if [ $CMD_RC -ne 0 ]; then
+                    log_error "Falha ao remover $pkg (rc=$CMD_RC). Ver arquivo de log para detalhes." 
+                else
+                    log_info "Remoção de $pkg concluída." 
+                fi
+            fi
+        fi
+    done
+}
+
 # Modo de execução: dry-run
 DRY_RUN=false
 for __arg in "$@"; do
@@ -110,9 +162,48 @@ run_pacman() {
     if [ "${DRY_RUN}" = true ]; then
         log_info "DRY-RUN: pacman $*"
         return 0
-    else
-        sudo pacman "$@"
     fi
+
+    # Antes: resolver conflitos conhecidos proativamente
+    resolve_known_conflicts
+
+    run_cmd "pacman $*" sudo pacman "$@"
+    if [ $CMD_RC -ne 0 ]; then
+        # Mensagens não-fatais (pacote já instalado / nada para fazer)
+        if echo "$CMD_OUTPUT" | grep -qiE "está atualizado|is up to date|nada para fazer|already up-to-date|nothing to do"; then
+            log_info "pacman informou que nada precisa ser feito (pacote já instalado/up-to-date). Ignorando erro." 
+            return 0
+        fi
+
+        # Conflitos de pacotes — tentar resolver automaticamente e reexecutar
+        if echo "$CMD_OUTPUT" | grep -qi "conflito de pacotes"; then
+            log_warn "Conflito de pacotes detectado. Tentando resolver conflitos conhecidos e reinstalar."
+            resolve_known_conflicts
+            run_cmd "pacman retry $*" sudo pacman "$@"
+            if [ $CMD_RC -ne 0 ]; then
+                log_error "Instalação via pacman falhou após tentativa de resolver conflitos. Saída: $CMD_OUTPUT"
+                return $CMD_RC
+            fi
+            return 0
+        fi
+
+        # Falha de download (404) — atualizar base e tentar novamente
+        if echo "$CMD_OUTPUT" | grep -qiE "falha ao obter o arquivo|The requested URL returned error|404"; then
+            log_warn "Falha de download detectada (possível mirror quebrado). Forçando refresh dos repositórios e tentando novamente."
+            run_cmd "pacman -Syy" sudo pacman -Syy --noconfirm
+            run_cmd "pacman retry $*" sudo pacman "$@"
+            if [ $CMD_RC -ne 0 ]; then
+                log_error "Instalação via pacman falhou após refresh (provável problema externo). Saída: $CMD_OUTPUT"
+                return $CMD_RC
+            fi
+            return 0
+        fi
+
+        # Caso geral — registra e propaga o erro
+        log_error "pacman retornou erro (rc=$CMD_RC). Saída registrada no log temporário." 
+        return $CMD_RC
+    fi
+    return 0
 }
 
 run_nft() {
@@ -325,13 +416,64 @@ aur_install() {
         return 0
     fi
     if command -v paru &>/dev/null; then
-        paru -S --noconfirm --needed "$@"
+        run_cmd "paru -S --noconfirm --needed $*" paru -S --noconfirm --needed "$@"
+        if [ $CMD_RC -ne 0 ]; then
+            log_error "Erro ao instalar via paru: $* (rc=$CMD_RC). Ver log temporário para detalhes."
+            return $CMD_RC
+        fi
     elif command -v yay &>/dev/null; then
-        yay -S --noconfirm --needed "$@"
+        run_cmd "yay -S --noconfirm --needed $*" yay -S --noconfirm --needed "$@"
+        if [ $CMD_RC -ne 0 ]; then
+            log_error "Erro ao instalar via yay: $* (rc=$CMD_RC). Ver log temporário para detalhes."
+            return $CMD_RC
+        fi
     else
         log_error "Nenhum helper AUR disponível para instalar: $*"
         return 1
     fi
+}
+
+# Instala Cloudflare WARP e aceita automaticamente os termos quando possível
+install_cloudflare_warp() {
+    log_info "Instalando Cloudflare WARP (aceitação automática de termos quando suportado)."
+    garantir_aur_helper || return 1
+    if [ "${DRY_RUN}" = true ]; then
+        log_info "DRY-RUN: instalar cloudflare-warp-bin (simulação)."
+        return 0
+    fi
+
+    if command -v paru &>/dev/null; then
+        set +e
+        yes | paru -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
+        local rc=${PIPESTATUS[1]:-${PIPESTATUS[0]:-1}}
+        set -e
+    elif command -v yay &>/dev/null; then
+        set +e
+        yes | yay -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
+        local rc=${PIPESTATUS[1]:-${PIPESTATUS[0]:-1}}
+        set -e
+    else
+        aur_install cloudflare-warp-bin || return 1
+        rc=0
+    fi
+
+    if [ "${rc:-0}" -ne 0 ]; then
+        log_error "Instalação do cloudflare-warp-bin falhou (rc=${rc}). Ver log para detalhes."
+        return ${rc}
+    fi
+
+    run_systemctl enable --now warp-svc || log_warn "Não foi possível habilitar warp-svc (verifique permissões)."
+
+    # Registrar e conectar — tentar modo não interativo quando possível
+    if command -v warp-cli &>/dev/null; then
+        set +e
+        yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
+        warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
+        set -e
+    fi
+
+    return 0
 }
 
 # ═══════════════════════════════════════════════
@@ -352,9 +494,11 @@ instalar_seguranca() {
     echo -e "${YELLOW}[1/5]${NC} Instalando Cloudflare WARP..."
     log_info "Verificando presença do warp-cli e do serviço warp-svc."
     if ! command -v warp-cli &>/dev/null; then
-        garantir_aur_helper || return 1
-        aur_install cloudflare-warp-bin
+        install_cloudflare_warp || {
+            log_error "Falha ao instalar Cloudflare WARP. Verifique o log para detalhes." 
+        }
     fi
+
     if ! command -v warp-cli &>/dev/null; then
         if [ "${DRY_RUN}" = true ]; then
             log_info "DRY-RUN: warp-cli não está instalado, simulando instalação em dry-run."
@@ -363,12 +507,13 @@ instalar_seguranca() {
             return 1
         fi
     fi
-    run_systemctl enable --now warp-svc
+
+    run_systemctl enable --now warp-svc || log_warn "Não foi possível habilitar warp-svc automaticamente."
     if ! systemctl is-active --quiet warp-svc; then
         if [ "${DRY_RUN}" = true ]; then
             log_info "DRY-RUN: serviço warp-svc não iniciado (simulação)."
         else
-            log_error "O serviço warp-svc não iniciou corretamente."
+            log_error "O serviço warp-svc não iniciou corretamente. Ver log para detalhes."
             return 1
         fi
     fi
@@ -377,17 +522,19 @@ instalar_seguranca() {
         log_info "DRY-RUN: pular comandos 'warp-cli registration/mode/connect' (simulação)."
     else
         if ! warp-cli status 2>/dev/null | grep -qi "registration\|registered\|connected"; then
-            log_info "Registrando o cliente WARP neste sistema."
-            warp-cli registration new
+            log_info "Registrando o cliente WARP neste sistema (não-interativo quando possível)."
+            set +e
+            yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
+            set -e
         fi
         log_info "Aplicando modo WARP e iniciando conexão."
-        warp-cli mode warp
-        warp-cli connect
+        warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
         sleep 2
         if warp-cli status 2>/dev/null | grep -qi "connected"; then
             log_success "WARP configurado e conectado."
         else
-            log_error "WARP não confirmou conexão após a configuração."
+            log_error "WARP não confirmou conexão após a configuração. Saída registrada no log." 
             return 1
         fi
     fi
@@ -593,11 +740,17 @@ verificar_status() {
 
     echo ""
     echo -e "${CYAN}─── Firewall ───${NC}"
-    if sudo nft list table inet filter 2>/dev/null | grep -q "type filter hook input priority 0; policy drop;" \
-        && sudo nft list table inet filter 2>/dev/null | grep -q "type filter hook forward priority 0; policy drop;"; then
-        log_success "Firewall ativo com política DROP em input e forward."
+    run_cmd "listar nft ruleset" sudo nft list table inet filter
+    if [ $CMD_RC -ne 0 ]; then
+        log_error "Não foi possível listar regras nftables (rc=$CMD_RC). Saída: $CMD_OUTPUT"
+        log_warn "Verifique se o serviço 'nftables' está ativo: sudo systemctl status nftables"
     else
-        log_warn "Firewall pode não estar configurado corretamente."
+        if echo "$CMD_OUTPUT" | grep -q "type filter hook input priority 0; policy drop;" \
+           && echo "$CMD_OUTPUT" | grep -q "type filter hook forward priority 0; policy drop;"; then
+            log_success "Firewall ativo com política DROP em input e forward."
+        else
+            log_warn "Firewall parece não aplicar a política DROP esperada. Conteúdo do ruleset:\n$CMD_OUTPUT"
+        fi
     fi
 
     echo ""
