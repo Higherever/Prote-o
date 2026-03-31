@@ -1,6 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- Sistema de logging (cria log temporário e move para ~/Documentos em caso de erro) ---
+# O arquivo de log final só será criado em ~/Documentos se o script terminar com erro.
+TEMP_LOG="$(mktemp -t instalar_log.XXXXXX)" || { echo "Falha ao criar log temporário"; exit 1; }
+# preserva stdout/stderr originais
+exec 3>&1 4>&2
+# redireciona stdout/stderr para console e para o log temporário
+exec > >(tee -a "$TEMP_LOG") 2>&1
+
+echo "========================================"
+echo "Script: $0"
+echo "Início: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "Usuário: $(whoami)"
+echo "PWD: $PWD"
+echo "Args: $*"
+echo "========================================"
+
+set -o errtrace
+
+on_error() {
+    local exit_code=$?
+    local lineno=${1:-0}
+    local last_cmd=${BASH_COMMAND:-}
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERRO: comando '${last_cmd}' retornou ${exit_code} na linha ${lineno}" >&2
+}
+
+on_exit() {
+    local exit_code=$?
+    # restaura fds antes de mover/mostrar mensagem final
+    exec 1>&3 2>&4
+    if [ "$exit_code" -ne 0 ]; then
+        local dest_dir="$HOME/Documentos"
+        mkdir -p "$dest_dir"
+        local dest_file="$dest_dir/instalar_$(date '+%Y%m%d_%H%M%S').log"
+        mv "$TEMP_LOG" "$dest_file"
+        echo "Log de erro salvo em: $dest_file" >&2
+    else
+        rm -f "$TEMP_LOG"
+    fi
+}
+
+trap 'on_error $LINENO' ERR
+trap 'on_exit' EXIT
+
 # ═══════════════════════════════════════════════
 #              CORES
 # ═══════════════════════════════════════════════
@@ -286,7 +329,7 @@ aur_install() {
 instalar_seguranca() {
     echo ""
     echo -e "${CYAN}══════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  PROTEÇÃO COMPLETA — CachyOS (Gaming Safe)  ${NC}"
+    echo -e "${CYAN}  PROTEÇÃO COMPLETA — CachyOS (Jogo Seguro)  ${NC}"
     echo -e "${CYAN}══════════════════════════════════════════════${NC}"
 
     echo ""
@@ -556,7 +599,7 @@ verificar_status() {
     fi
 
     echo ""
-    echo -e "${CYAN}─── Kernel (Gaming Safe) ───${NC}"
+    echo -e "${CYAN}─── Kernel (Jogo Seguro) ───${NC}"
     SYNCOOKIES=$(sysctl -n net.ipv4.tcp_syncookies 2>/dev/null)
     RPFILTER=$(sysctl -n net.ipv4.conf.all.rp_filter 2>/dev/null)
     ASLR=$(sysctl -n kernel.randomize_va_space 2>/dev/null)
@@ -568,7 +611,7 @@ verificar_status() {
 
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  ✅ PROTEÇÃO APLICADA (GAMING SAFE)            ${NC}"
+    echo -e "${GREEN}  ✅ PROTEÇÃO APLICADA (Jogo Seguro)            ${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${GREEN}•${NC} IP oculto via Cloudflare WARP"
@@ -592,7 +635,7 @@ verificar_status() {
 #              MENU PRINCIPAL
 # ═══════════════════════════════════════════════
 echo -e "${CYAN}══════════════════════════════════════════════${NC}"
-echo -e "${CYAN}     INSTALADOR — CachyOS (Gaming Safe)      ${NC}"
+echo -e "${CYAN}     INSTALADOR — CachyOS (Jogo seguro)      ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════${NC}"
 echo ""
 echo "Escolha uma opção:"
