@@ -798,6 +798,24 @@ verificar_status() {
 # ═══════════════════════════════════════════════
 #              MENU PRINCIPAL
 # ═══════════════════════════════════════════════
+# Se a variável PROTECAO_RUN_FUNC estiver definida, executa a função
+# diretamente (útil para chamadas automatizadas / GUI). Isso evita que o
+# menu interativo seja apresentado quando o script for chamado por outra
+# aplicação via source/exec.
+if [ -n "${PROTECAO_RUN_FUNC:-}" ]; then
+    func="$PROTECAO_RUN_FUNC"
+    # Verifica se a função existe antes de executar
+    if declare -F "$func" >/dev/null 2>&1; then
+        log_info "Executando função via PROTECAO_RUN_FUNC: $func"
+        # Chama a função e sai com seu código de retorno
+        "$func"
+        exit $?
+    else
+        log_error "Função solicitada não encontrada: $func"
+        exit 2
+    fi
+fi
+
 echo -e "${CYAN}══════════════════════════════════════════════${NC}"
 echo -e "${CYAN}     INSTALADOR — CachyOS (Jogo seguro)      ${NC}"
 echo -e "${CYAN}══════════════════════════════════════════════${NC}"
