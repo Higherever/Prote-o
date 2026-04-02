@@ -1,53 +1,98 @@
 # 🛡️ Proteção Completa — CachyOS (Gaming Safe)
 
-Script de proteção completa para CachyOS Linux, **compatível com jogos online da Steam** (Overwatch 2, CS2, Fortnite, etc.) e anti-cheats (EAC, BattlEye, Vanguard).
+O **Proteção** é uma solução robusta para endurecimento de segurança no CachyOS/Arch Linux, projetada para ser 100% compatível com jogos online (Steam, Epic, BattlEye, EAC) enquanto protege sua privacidade e integridade do sistema.
 
-## O que faz
+Esta nova versão conta com uma interface moderna em **Electron + React** e um backend potente em **Python (FastAPI)** que gerencia a execução segura do script de instalação.
 
-| Camada | Descrição | Gaming Safe? |
-|--------|-----------|:------------:|
-| **Cloudflare WARP** | Oculta seu IP real | ✅ |
-| **nftables Firewall** | Política DROP + portas Steam/Blizzard abertas | ✅ |
-| **Kernel Hardening** | sysctl seguro com `ptrace_scope=1` | ✅ |
-| **Fail2Ban** | Bloqueia brute-force SSH | ✅ |
+---
 
-## Mudanças da v3 (Gaming Safe)
+## 🚀 O que o projeto faz?
 
-O script anterior tinha problemas que impediam jogos online:
+O sistema atua em quatro frentes principais de forma automatizada:
 
-1. `kernel.yama.ptrace_scope = 2` bloqueava anti-cheats (EAC/BattlEye). Agora é `1`.
-2. `kernel.kptr_restrict = 2` podia interferir com anti-cheat. Agora é `1`.
-3. Firewall sem portas de jogos. Agora tem portas Steam e Blizzard liberadas.
-4. ICMP restrito. Agora aceita todo ICMP.
+| Camada | Funcionalidade | Gaming Safe? |
+|:--- |:--- |:---:|
+| **🌐 Cloudflare WARP** | Oculta seu IP real e criptografa o tráfego DNS. | ✅ Sim |
+| **🛡️ nftables Firewall** | Firewall moderno com política DROP restritiva, pré-configurado para portas Steam/Blizzard/Epic. | ✅ Sim |
+| **⚙️ Kernel Hardening** | Ajustes de sysctl para proteção contra ataques de memória e ptrace, sem quebrar Anti-Cheats. | ✅ Sim |
+| **🚫 Fail2Ban** | Proteção ativa contra ataques de dicionário e brute-force em serviços locais. | ✅ Sim |
 
-## Instalação
+### 🎨 Interface Gráfica (GUI)
+A nova interface oferece um fluxo intuitivo:
+1. **Boas-vindas**: Introdução e verificação de ambiente.
+2. **Opções**: Escolha entre Instalação de Segurança, Ferramentas de Jogos ou Configuração Completa.
+3. **Progresso Real-Time**: Acompanhamento visual e logs em tempo real via WebSocket enquanto o script roda com privilégios elevados (via Polkit).
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+
+O projeto utiliza uma stack moderna para garantir performance e facilidade de manutenção:
+
+*   **Frontend**: [React 19](https://react.dev/) com [TypeScript](https://www.typescriptlang.org/) e [Vite](https://vitejs.dev/). Estilizado com CSS3 puro e animações Canvas.
+*   **Desktop Shell**: [Electron 35](https://www.electronjs.org/) para uma experiência de aplicativo nativo.
+*   **Backend**: [Python 3.14+](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/) e WebSockets para comunicação bidirecional.
+*   **Script Core**: Bash especializado para Arch Linux / CachyOS com sistema de logs cumulativos.
+*   **Segurança**: Integração com **PolicyKit (pkexec)** para elevação de privilégios segura.
+
+---
+
+## 📋 Pré-requisitos (CachyOS / Arch)
+
+Para que o script e a interface funcionem perfeitamente no seu CachyOS, você deve garantir que possui as seguintes dependências instaladas:
 
 ```bash
-git clone https://github.com/Higherever/Prote-o.git
-cd Prote-o
-chmod +x instalar.sh
-bash instalar.sh
+# Instalar dependências básicas de compilação e execução
+sudo pacman -S --needed base-devel git nodejs npm python python-pip python-virtualenv 
+
+# Garantir que o Polkit está presente (geralmente já vem no CachyOS)
+sudo pacman -S --needed polkit 
 ```
 
-## Verificar após instalar
+**Nota**: O projeto configura automaticamente um Ambiente Virtual (venv) para o Python e instala as dependências do Node.js durante o primeiro uso.
 
-- https://whoer.net
-- https://ipleak.net
+---
 
-## Comandos úteis
+## 📥 Como Instalar e Rodar
 
-```bash
-warp-cli status
-warp-cli disconnect
-warp-cli connect
-sudo nft list ruleset
-sudo fail2ban-client status
-sysctl kernel.yama.ptrace_scope
-```
+1. **Clonar o repositório**:
+    ```bash
+    git clone https://github.com/Higherever/Prote-o.git
+    cd Prote-o
+    ```
 
-## Se um jogo não abrir
+2. **Instalar dependências do App**:
+    ```bash
+    cd app
+    npm install
+    ```
 
-1. Desconecte o WARP: `warp-cli disconnect`
-2. Teste o jogo
-3. Se funcionar, o WARP interfere com esse jogo
-4. Reconecte depois: `warp-cli connect`
+3. **Executar em modo Desenvolvedor**:
+    ```bash
+    npm run dev
+    ```
+
+4. **Rodar a aplicação**:
+    ```bash
+    npm start
+    ```
+
+---
+
+## 📊 Sistema de Logs
+
+O projeto mantém um histórico detalhado para facilitar a depuração:
+*   **Logs da Interface**: Localizados em `logs/logFront/`
+*   **Logs do Instalador**: Localizados em `logs/logBack/`
+
+---
+
+## 📞 Suporte e Comandos Úteis
+
+Após a instalação, você pode gerenciar os serviços manualmente se desejar:
+*   Status do WARP: `warp-cli status`
+*   Regras de Firewall: `sudo nft list ruleset`
+*   Status do Hardening: `sysctl kernel.yama.ptrace_scope`
+
+---
+*Desenvolvido para a comunidade CachyOS.* 🛡️🎮
