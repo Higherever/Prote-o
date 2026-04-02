@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { WSMessage } from '../hooks/useWebSocket';
+import Loading26 from './Loading26';
 
 interface ProgressProps {
   funcao: string;
@@ -62,18 +63,7 @@ export default function Progress({ funcao, ws }: ProgressProps) {
 
   return (
     <div className="tela-progresso" id="tela-progresso">
-      {/* Animação GIF — equivalente a animWidget com Loop.gif */}
-      {gifCarregado ? (
-        <img
-          src="./assets/Loop.gif"
-          alt="Animação de instalação"
-          className="animacao-progresso"
-          onError={() => setGifCarregado(false)}
-        />
-      ) : (
-        // Fallback: spinner CSS quando o GIF não carrega
-        <div className="spinner" />
-      )}
+      {status === 'executando' && <Loading26 />}
 
       {/* Texto de status — equivalente a textoStatus */}
       <p

@@ -23,8 +23,11 @@ from pydantic import BaseModel
 from logger import configurar_logs
 from runner import executar_funcao, esta_executando, obter_erro
 
-# Configura logs acumulativos
+# Configura logs acumulativos — primeiro passo da inicialização
 log = configurar_logs()
+
+log.info("[INIT] Módulos importados com sucesso")
+log.info("[INIT] Iniciando FastAPI (Proteção Backend)...")
 
 app = FastAPI(title="Proteção Backend")
 
@@ -49,12 +52,14 @@ ws_connections: list[WebSocket] = []
 @app.get("/api/health")
 async def health():
     """Health check — usado pelo Electron para saber quando o backend está pronto."""
+    log.debug("[API] /api/health chamado — Electron aguardando backend")
     return {"status": "ok"}
 
 
 @app.post("/api/executar")
 async def api_executar(cmd: ComandoExecutar):
     """Inicia a execução de uma função do script instalar.sh."""
+    log.info("[API] POST /api/executar recebido")
     log.info("[API] Requisição para executar: %s", cmd.funcao)
 
     if esta_executando():
@@ -128,7 +133,9 @@ async def websocket_progresso(websocket: WebSocket):
 
 def handle_sigterm(*args):
     """Encerra graciosamente ao receber SIGTERM."""
-    log.info("Recebido sinal de encerramento. Finalizando backend...")
+    log.info("[SHUTDOWN] Sinal de encerramento recebido (SIGTERM/SIGINT)")
+    log.info("[SHUTDOWN] Backend FastAPI finalizado.")
+    log.info("=" * 60)
     sys.exit(0)
 
 
@@ -137,6 +144,9 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, handle_sigterm)
 
     port = int(os.environ.get("PROTECAO_PORT", "8000"))
-    log.info("Iniciando servidor backend na porta %d", port)
+    log.info("[INIT] Servidor backend iniciando na porta %d", port)
+    log.info("[INIT] Endereço: http://127.0.0.1:%d", port)
+    log.info("[INIT] Health check disponível em: /api/health")
+    log.info("[INIT] WebSocket disponível em: /ws/progresso")
 
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

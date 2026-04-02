@@ -21,6 +21,23 @@ const isDev = process.env.NODE_ENV === 'development';
 const PYTHON_PORT = 8000;
 const VITE_PORT = 5173;
 
+// === LOGS DE INICIALIZAÇÃO DO ELECTRON ===
+console.log('=' .repeat(60));
+console.log('  PROTEÇÃO GUI — ELECTRON INICIANDO');
+console.log('=' .repeat(60));
+console.log(`[INIT] Timestamp        : ${new Date().toISOString()}`);
+console.log(`[INIT] Versão Electron  : ${process.versions.electron}`);
+console.log(`[INIT] Versão Node      : ${process.versions.node}`);
+console.log(`[INIT] Versão V8        : ${process.versions.v8}`);
+console.log(`[INIT] Plataforma       : ${process.platform} (${process.arch})`);
+console.log(`[INIT] Modo             : ${isDev ? 'DESENVOLVIMENTO (Vite)' : 'PRODUÇÃO (build estático)'}`);
+console.log(`[INIT] NODE_ENV         : ${process.env.NODE_ENV || '(não definido)'}`);
+console.log(`[INIT] DISPLAY          : ${process.env.DISPLAY || '(não definido)'}`);
+console.log(`[INIT] WAYLAND_DISPLAY  : ${process.env.WAYLAND_DISPLAY || '(não definido)'}`);
+console.log(`[INIT] XDG_SESSION_TYPE : ${process.env.XDG_SESSION_TYPE || '(não definido)'}`);
+console.log(`[INIT] XDG_CURRENT_DESK : ${process.env.XDG_CURRENT_DESKTOP || '(não definido)'}`);
+console.log('-'.repeat(60));
+
 /**
  * Inicia o backend Python (FastAPI + Uvicorn)
  */
@@ -32,7 +49,10 @@ function startPythonBackend() {
   const venvExecutable = path.join(__dirname, '..', 'backend', 'venv', 'bin', 'python3');
   const pythonExecutable = fs.existsSync(venvExecutable) ? venvExecutable : 'python3';
   
-  console.log(`[Electron] Iniciando backend Python via: ${pythonExecutable}`);
+  console.log(`[INIT] Iniciando backend Python...`);
+  console.log(`[INIT] Executável  : ${pythonExecutable}`);
+  console.log(`[INIT] Script      : ${backendPath}`);
+  console.log(`[INIT] Porta       : ${PYTHON_PORT}`);
   
   pythonProcess = spawn(pythonExecutable, [backendPath], {
     env: { ...process.env, PROTECAO_PORT: String(PYTHON_PORT) },
@@ -49,11 +69,11 @@ function startPythonBackend() {
   });
 
   pythonProcess.on('close', (code) => {
-    console.log(`[Python] Processo encerrado com código ${code}`);
+    console.log(`[PYTHON] Processo encerrado com código: ${code}`);
   });
 
   pythonProcess.on('error', (err) => {
-    console.error(`[Python] Erro ao iniciar processo: ${err.message}`);
+    console.error(`[PYTHON] Erro ao iniciar processo: ${err.message}`);
   });
 }
 
@@ -101,6 +121,8 @@ function waitForBackend(maxRetries = 60) {
  * Cria a janela principal — equivalente a CriarJanelaPrincipal()
  */
 function createWindow() {
+  console.log('[ELECTRON] Criando janela principal...');
+
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -108,7 +130,7 @@ function createWindow() {
     minHeight: 480,
     frame: false, // Frameless — igual ao SetDecorated(false) do GTK
     resizable: true,
-    backgroundColor: '#f4f5f5',
+    backgroundColor: '#3c3b46',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -118,16 +140,17 @@ function createWindow() {
   });
 
   if (isDev) {
-    // Em desenvolvimento, carrega do Vite dev server
-    mainWindow.loadURL(`http://localhost:${VITE_PORT}`);
-    // Descomente para abrir DevTools:
-    // mainWindow.webContents.openDevTools();
+    const url = `http://localhost:${VITE_PORT}`;
+    console.log(`[ELECTRON] Modo DEV — carregando Vite dev server: ${url}`);
+    mainWindow.loadURL(url);
   } else {
-    // Em produção, carrega o build estático do React
-    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    const filePath = path.join(__dirname, '..', 'dist', 'index.html');
+    console.log(`[ELECTRON] Modo PRODUÇÃO — carregando build estático: ${filePath}`);
+    mainWindow.loadFile(filePath);
   }
 
   mainWindow.on('closed', () => {
+    console.log('[ELECTRON] Janela principal fechada.');
     mainWindow = null;
   });
 }
@@ -152,22 +175,31 @@ ipcMain.on('window-close', () => {
 
 // === Lifecycle da aplicação ===
 app.whenReady().then(async () => {
+  console.log('[ELECTRON] App pronto. Iniciando sequência de boot...');
+
   // 1. Inicia o backend Python
+  console.log('[BOOT] Passo 1/3 — Iniciando backend Python...');
   startPythonBackend();
 
   // 2. Aguarda o backend estar pronto
+  console.log('[BOOT] Passo 2/3 — Aguardando backend responder...');
   try {
     await waitForBackend();
+    console.log('[BOOT] Backend respondeu com sucesso!');
   } catch (e) {
-    console.error('[Electron] Falha ao iniciar backend Python:', e.message);
+    console.error('[BOOT] Falha ao iniciar backend Python:', e.message);
     // Continua mesmo sem backend — a UI pode mostrar erro
   }
 
   // 3. Cria a janela principal
+  console.log('[BOOT] Passo 3/3 — Criando janela principal...');
   createWindow();
+  console.log('[BOOT] Sequência de boot concluída. Aplicação pronta.');
+  console.log('='.repeat(60));
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
+      console.log('[ELECTRON] Reativando janela principal...');
       createWindow();
     }
   });
@@ -176,9 +208,10 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   // Encerra o Python quando fechar todas as janelas
   if (pythonProcess) {
-    console.log('[Electron] Encerrando backend Python...');
+    console.log('[ELECTRON] Todas as janelas fechadas. Encerrando backend Python...');
     pythonProcess.kill('SIGTERM');
   }
+  console.log('[ELECTRON] Aplicação encerrada.');
   app.quit();
 });
 

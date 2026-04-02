@@ -53,29 +53,32 @@ sudo pacman -S --needed polkit
 
 ---
 
-## 📥 Como Instalar e Rodar
+## 📥 Como Usar
 
-1. **Clonar o repositório**:
-    ```bash
-    git clone https://github.com/Higherever/Prote-o.git
-    cd Prote-o
-    ```
+> **Requisito**: tenha `git`, `nodejs`, `npm`, `python`, `python-virtualenv` e `polkit` instalados.
+> ```bash
+> sudo pacman -S --needed git nodejs npm python python-virtualenv polkit
+> ```
 
-2. **Instalar dependências do App**:
-    ```bash
-    cd app
-    npm install
-    ```
+Cole o bloco abaixo no terminal. Ele clona o repositório, instala todas as dependências e abre a interface visual automaticamente:
 
-3. **Executar em modo Desenvolvedor**:
-    ```bash
-    npm run dev
-    ```
+```bash
+git clone https://github.com/Higherever/Prote-o.git && \
+cd Prote-o/app && \
+python3 -m venv backend/venv && \
+backend/venv/bin/pip install -r backend/requirements.txt -q && \
+npm install --silent && \
+npm run build && \
+electron .
+```
 
-4. **Rodar a aplicação**:
-    ```bash
-    npm start
-    ```
+> **O que cada passo faz:**
+> 1. `git clone` — Baixa o repositório
+> 2. `python3 -m venv` — Cria o ambiente virtual Python isolado
+> 3. `pip install` — Instala FastAPI, Uvicorn e dependências do backend
+> 4. `npm install` — Instala React, Electron e dependências do frontend
+> 5. `npm run build` — Compila o React para produção
+> 6. `electron .` — Abre a interface visual
 
 ---
 

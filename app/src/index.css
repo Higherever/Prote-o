@@ -21,24 +21,29 @@
 }
 
 :root {
-  /* Paleta de cores — equivalente ao CSS do GTK3 */
-  --bg-primary: #f4f5f5;
-  --bg-titlebar: #e5e7eb;
-  --bg-titlebar-hover: #d1d5db;
-  --bg-card: rgba(255, 255, 255, 0.85);
+  /* Paleta de cores — Cores Sólidas solicitadas */
+  --bg-primary: #3c3b46;
+  --bg-titlebar: rgba(0, 0, 0, 0.2);
+  --bg-titlebar-hover: rgba(0, 0, 0, 0.3);
+  --bg-card: rgba(255, 255, 255, 0.05);
 
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-light: #3b82f6;
-  --color-primary-glow: rgba(37, 99, 235, 0.15);
+  --color-primary: #60a5fa;
+  --color-primary-hover: #3b82f6;
+  --color-primary-light: #93c5fd;
+  --color-primary-glow: rgba(96, 165, 250, 0.3);
 
-  --color-text: #1f2937;
-  --color-text-muted: #6b7280;
-  --color-text-light: #9ca3af;
+  --color-text: #f7f7f7;
+  --color-text-muted: rgba(247, 247, 247, 0.7);
+  --color-text-light: rgba(247, 247, 247, 0.5);
 
   --color-close-hover: #e81123;
   --color-success: #10b981;
   --color-error: #ef4444;
+
+  /* Cores Wibushi */
+  --color-wibushi: #515d7d;
+  --color-wibushi-light: #647194;
+  --color-wibushi-text: #ffffff;
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -152,13 +157,7 @@ body {
   z-index: 1;
 }
 
-/* ===== Vagalumes (Canvas) ===== */
-.canvas-vagalumes {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
+/* Fundos removidos — Apenas cor sólida agora. */
 
 /* ===== Tela de Boas-Vindas ===== */
 .tela-boas-vindas {
@@ -208,9 +207,9 @@ body {
 }
 
 .btn-opcao {
-  background-color: var(--bg-card);
-  color: var(--color-primary);
-  border: 2px solid var(--color-primary-light);
+  background-color: transparent;
+  color: var(--color-wibushi);
+  border: 2px solid var(--color-wibushi);
   border-radius: var(--radius-sm);
   padding: 16px 36px;
   font-family: var(--font-family);
@@ -219,24 +218,39 @@ body {
   min-width: 320px;
   min-height: 52px;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: color 0.4s ease, border-color 0.4s ease;
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px var(--color-primary-glow);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Pseudo-elemento para a animação de preenchimento lateral (Wibushi style) */
+.btn-opcao::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 100%;
+  background-color: var(--color-wibushi);
+  z-index: -1;
+  transition: width 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.btn-opcao:hover::before {
+  width: 100%;
 }
 
 .btn-opcao:hover {
-  background-color: var(--color-primary);
-  color: #ffffff;
-  border-color: var(--color-primary-hover);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
-  transform: translateY(-2px);
+  color: var(--color-wibushi-text);
+  border-color: var(--color-wibushi);
 }
 
 .btn-opcao:active {
-  transform: translateY(0px);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+  transform: scale(0.98);
 }
 
 .btn-opcao:disabled {
@@ -324,6 +338,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -333,6 +348,7 @@ body {
   from {
     opacity: 1;
   }
+
   to {
     opacity: 0;
   }
@@ -343,6 +359,7 @@ body {
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -356,11 +373,35 @@ body {
 }
 
 @keyframes pulse {
+
   0%,
   100% {
     opacity: 0.6;
   }
+
   50% {
     opacity: 1;
   }
+}
+
+@keyframes stream {
+  0%,
+  100% {
+    transform: translateX(0) scale(0);
+  }
+  50% {
+    transform: translateX(calc(var(--uib-size) * 0.5)) scale(1);
+  }
+  99.999% {
+    transform: translateX(calc(var(--uib-size))) scale(0);
+  }
+}
+
+.loading26-container {
+  margin-bottom: 24px;
+}
+
+.loading26-svg {
+  pointer-events: none;
+  user-select: none;
 }

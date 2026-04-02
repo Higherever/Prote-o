@@ -17,7 +17,6 @@ import TitleBar from './components/TitleBar';
 import Welcome from './components/Welcome';
 import Options from './components/Options';
 import Progress from './components/Progress';
-import Fireflies from './components/Fireflies';
 import { useWebSocket } from './hooks/useWebSocket';
 
 type Fase = 'boas-vindas' | 'opcoes' | 'progresso';
@@ -47,10 +46,7 @@ export default function App() {
 
       {/* Container principal com overlay */}
       <div className="conteudo-principal">
-        {/* Vagalumes no fundo — equivalente a NovoMotorVagalumes() */}
-        <Fireflies quantidade={40} />
-
-        {/* Container das fases (por cima dos vagalumes) */}
+        {/* Container das fases */}
         <div className="container-fases">
           {faseAtual === 'boas-vindas' && (
             <Welcome onComplete={aoFinalizarBoasVindas} />

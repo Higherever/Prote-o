@@ -5,6 +5,18 @@ Todos os mudanças notáveis neste projeto são documentadas neste arquivo.
 ## [v0.2.0] - 2026-04-02
 
 ### Added
+- Tema Escuro (Dark Mode) configurado como padrão (`#3c3b46` e `#f7f7f7`).
+- Novo componente de animação `Loading26.tsx` para a tela de progresso.
+- Sistema de retenção de logs: limite de 10 arquivos por categoria com limpeza automática do mais antigo.
+- Coleta automática de metadados do sistema (Kernel, OS, Display Server, Desktop Environment) nos logs.
+- Estilização premium dos botões de opções com animação de preenchimento lateral (estilo Wibushi).
+
+### Removed
+- `app/src/components/Fireflies.tsx`: Removido em favor do novo tema visual simplificado.
+
+## [v0.1.5] - 2026-04-02
+
+### Added
 - Migração completa da interface gráfica de Go (GTK3) para Python (FastAPI) + React (Vite+TS) + Electron.
 - Sistema de logs cumulativos em `logs/logFront/` e `logs/logBack/`.
 - Nova animação centralizada (`Loop.gif`) com tema claro e visual moderno.

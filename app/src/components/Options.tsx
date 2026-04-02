@@ -19,9 +19,9 @@ const API_BASE = 'http://127.0.0.1:8000';
 
 // Definição das opções — equivalente a var Opcoes em options.go
 const OPCOES = [
-  { nome: 'Opção 1 — Segurança', funcao: 'instalar_seguranca' },
-  { nome: 'Opção 2 — Jogos', funcao: 'instalar_jogos' },
-  { nome: 'Opção 3 — Configuração Completa', funcao: 'configuracao_completa' },
+  { nome: 'Proteção e Segurança', funcao: 'instalar_seguranca' },
+  { nome: 'Otimização para Jogos', funcao: 'instalar_jogos' },
+  { nome: 'Configuração Completa', funcao: 'configuracao_completa' },
 ];
 
 interface OptionsProps {
