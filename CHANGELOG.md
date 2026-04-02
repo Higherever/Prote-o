@@ -2,6 +2,27 @@
 
 Todos os mudanças notáveis neste projeto são documentadas neste arquivo.
 
+## [v0.2.0] - 2026-04-02
+
+### Added
+- Migração completa da interface gráfica de Go (GTK3) para Python (FastAPI) + React (Vite+TS) + Electron.
+- Sistema de logs cumulativos em `logs/logFront/` e `logs/logBack/`.
+- Nova animação centralizada (`Loop.gif`) com tema claro e visual moderno.
+- Suporte a ambiente virtual (venv) para isolamento de dependências Python.
+- Tratamento de códigos ANSI nos logs capturados do script.
+- Verificação visual de redimensionamento dinâmico (responsividade no Hyprland).
+
+### Changed
+- `instalar.sh`: Adicionada flag `--accept-tos` para o `warp-cli`, permitindo execução não interativa via pkexec.
+- `instalar.sh`: Ajuste de permissões de log para 644 após execução via root.
+- Removido diretório legado `gui/` (Go).
+
+### Fixed
+- Erro de aceitação de termos do Cloudflare WARP sem TTY.
+- Problema de conexões WebSocket duplicadas no React StrictMode.
+- Erro de tipos TypeScript na API do Electron e caminhos de módulos.
+- Tela branca no modo produção do Electron.
+
 ## [v0.1.3] - 2026-03-31
 
 ### Added

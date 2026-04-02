@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- Sistema de logging (cria log temporário e move para ~/Documentos em caso de erro) ---
-# O arquivo de log final só será criado em ~/Documentos se o script terminar com erro.
+# --- Sistema de logging (acumulativo persistente num diretório específico) ---
+# O arquivo de log final será movido para logs/logBack após a execução.
 TEMP_LOG="$(mktemp -t instalar_log.XXXXXX)" || { echo "Falha ao criar log temporário"; exit 1; }
 # preserva stdout/stderr originais
 exec 3>&1 4>&2
@@ -30,14 +30,17 @@ on_exit() {
     local exit_code=$?
     # restaura fds antes de mover/mostrar mensagem final
     exec 1>&3 2>&4
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local dest_dir="$script_dir/logs/logBack"
+    mkdir -p "$dest_dir"
+    local dest_file="$dest_dir/instalar_$(date '+%Y%m%d_%H%M%S').log"
+    mv "$TEMP_LOG" "$dest_file"
+    chmod 644 "$dest_file" 2>/dev/null || true
     if [ "$exit_code" -ne 0 ]; then
-        local dest_dir="$HOME/Documentos"
-        mkdir -p "$dest_dir"
-        local dest_file="$dest_dir/instalar_$(date '+%Y%m%d_%H%M%S').log"
-        mv "$TEMP_LOG" "$dest_file"
-        echo "Log de erro salvo em: $dest_file" >&2
+        echo "Log de ERRO salvo cumulativamente em: $dest_file" >&2
     else
-        rm -f "$TEMP_LOG"
+        echo "Log de SUCESSO salvo cumulativamente em: $dest_file"
     fi
 }
 
@@ -444,13 +447,13 @@ install_cloudflare_warp() {
 
     if command -v paru &>/dev/null; then
         set +e
-        yes | paru -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
-        local rc=${PIPESTATUS[1]:-${PIPESTATUS[0]:-1}}
+        paru -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
+        local rc=${PIPESTATUS[0]:-1}
         set -e
     elif command -v yay &>/dev/null; then
         set +e
-        yes | yay -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
-        local rc=${PIPESTATUS[1]:-${PIPESTATUS[0]:-1}}
+        yay -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
+        local rc=${PIPESTATUS[0]:-1}
         set -e
     else
         aur_install cloudflare-warp-bin || return 1
@@ -467,9 +470,9 @@ install_cloudflare_warp() {
     # Registrar e conectar — tentar modo não interativo quando possível
     if command -v warp-cli &>/dev/null; then
         set +e
-        yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
+        warp-cli registration new --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
         warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
-        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
+        warp-cli connect --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
         set -e
     fi
 
@@ -524,12 +527,12 @@ instalar_seguranca() {
         if ! warp-cli status 2>/dev/null | grep -qi "registration\|registered\|connected"; then
             log_info "Registrando o cliente WARP neste sistema (não-interativo quando possível)."
             set +e
-            yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
+            warp-cli registration new --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
             set -e
         fi
         log_info "Aplicando modo WARP e iniciando conexão."
         warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
-        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
+        warp-cli connect --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
         sleep 2
         if warp-cli status 2>/dev/null | grep -qi "connected"; then
             log_success "WARP configurado e conectado."
@@ -706,8 +709,6 @@ instalar_jogos() {
         wine-cachyos-opt \
         vesktop \
         google-chrome \
-        protontricks \
-        mangohud \
         goverlay
 
     echo ""

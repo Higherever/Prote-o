@@ -4,3 +4,11 @@
 *~
 .DS_Store
 MEMORI_PROMPT.md
+
+# Proteção App specific ignores
+app/node_modules/
+app/dist/
+app/backend/venv/
+app/backend/__pycache__/
+.vscode/
+logs/

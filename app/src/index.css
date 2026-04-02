@@ -1,0 +1,366 @@
+/**
+ * CSS Global — Equivalente ao gui/ui/css.go
+ *
+ * Mesmo tema visual: fundo #f4f5f5, acentos azuis #2563eb,
+ * botões brancos com borda azul, cantos arredondados 12px.
+ *
+ * Aprimoramentos:
+ * - Google Font Inter
+ * - Glassmorphism nos cards
+ * - Transições suaves
+ * - Micro-animações
+ */
+
+/* ===== Reset & Base ===== */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Paleta de cores — equivalente ao CSS do GTK3 */
+  --bg-primary: #f4f5f5;
+  --bg-titlebar: #e5e7eb;
+  --bg-titlebar-hover: #d1d5db;
+  --bg-card: rgba(255, 255, 255, 0.85);
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #3b82f6;
+  --color-primary-glow: rgba(37, 99, 235, 0.15);
+
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-text-light: #9ca3af;
+
+  --color-close-hover: #e81123;
+  --color-success: #10b981;
+  --color-error: #ef4444;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 4px;
+
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 500ms ease;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-family);
+  background-color: var(--bg-primary);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== Janela Principal ===== */
+#janela-principal {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* ===== Barra de Título ===== */
+.barra-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background-color: var(--bg-titlebar);
+  border-radius: var(--radius) var(--radius) 0 0;
+  /* Permite arrastar a janela no Electron */
+  -webkit-app-region: drag;
+  user-select: none;
+  flex-shrink: 0;
+  min-height: 38px;
+}
+
+.titulo-app {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.botoes-titulo {
+  display: flex;
+  gap: 4px;
+  /* Botões não devem ser arrastáveis */
+  -webkit-app-region: no-drag;
+}
+
+.btn-titulo {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  min-width: 30px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.btn-titulo:hover {
+  background-color: var(--bg-titlebar-hover);
+  color: var(--color-text);
+}
+
+.btn-fechar:hover {
+  background-color: var(--color-close-hover);
+  color: #ffffff;
+}
+
+/* ===== Conteúdo Principal (overlay) ===== */
+.conteudo-principal {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.container-fases {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* ===== Vagalumes (Canvas) ===== */
+.canvas-vagalumes {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ===== Tela de Boas-Vindas ===== */
+.tela-boas-vindas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  animation: fadeIn 0.8s ease;
+}
+
+.texto-boas-vindas {
+  color: var(--color-primary);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.subtexto-boas-vindas {
+  color: var(--color-text-muted);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.tela-boas-vindas.saindo {
+  animation: fadeOut 0.6s ease forwards;
+}
+
+/* ===== Tela de Opções ===== */
+.tela-opcoes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  animation: fadeInUp 0.5s ease;
+}
+
+.titulo-opcoes {
+  color: var(--color-primary);
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.btn-opcao {
+  background-color: var(--bg-card);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary-light);
+  border-radius: var(--radius-sm);
+  padding: 16px 36px;
+  font-family: var(--font-family);
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 320px;
+  min-height: 52px;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px var(--color-primary-glow);
+}
+
+.btn-opcao:hover {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary-hover);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+  transform: translateY(-2px);
+}
+
+.btn-opcao:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+}
+
+.btn-opcao:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ===== Tela de Progresso ===== */
+.tela-progresso {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  animation: fadeIn 0.5s ease;
+  max-width: 90%;
+}
+
+.animacao-progresso {
+  max-width: 400px;
+  max-height: 300px;
+  border-radius: var(--radius);
+}
+
+.texto-progresso {
+  color: var(--color-primary);
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.texto-progresso.sucesso {
+  color: var(--color-success);
+}
+
+.texto-progresso.erro {
+  color: var(--color-error);
+}
+
+/* Log container para saída do script */
+.log-container {
+  width: 100%;
+  max-width: 560px;
+  max-height: 180px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.log-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.log-container::-webkit-scrollbar-thumb {
+  background: var(--color-text-light);
+  border-radius: 2px;
+}
+
+.log-linha {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+/* Spinner de loading */
+.spinner {
+  width: 42px;
+  height: 42px;
+  border: 3px solid var(--color-primary-glow);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ===== Animações ===== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
