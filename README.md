@@ -17,11 +17,13 @@ O sistema atua em quatro frentes principais de forma automatizada:
 | **⚙️ Kernel Hardening** | Ajustes de sysctl para proteção contra ataques de memória e ptrace, sem quebrar Anti-Cheats. | ✅ Sim |
 | **🚫 Fail2Ban** | Proteção ativa contra ataques de dicionário e brute-force em serviços locais. | ✅ Sim |
 
-### 🎨 Interface Gráfica (GUI)
-A nova interface oferece um fluxo intuitivo:
-1. **Boas-vindas**: Introdução e verificação de ambiente.
-2. **Opções**: Escolha entre Instalação de Segurança, Ferramentas de Jogos ou Configuração Completa.
-3. **Progresso Real-Time**: Acompanhamento visual e logs em tempo real via WebSocket enquanto o script roda com privilégios elevados (via Polkit).
+### 🎨 Interface Gráfica (GUI) v0.2.0
+A interface foi totalmente remodelada para uma experiência **Premium** e **High-End**:
+
+1.  **Welcome & Fade-out**: Transições suaves e introdução minimalista.
+2.  **Premium Options**: Botões estilizados com animação de preenchimento dinâmico (estilo Wibushi).
+3.  **Dark Mode Nativo**: Interface otimizada para o tema escuro (`#3c3b46`) para reduzir o cansaço visual.
+4.  **Progresso em Tempo Real**: Acompanhamento via WebSocket com a nova animação `Loading26` e logs detalhados do backend.
 
 ---
 
