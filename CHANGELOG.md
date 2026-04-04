@@ -47,4 +47,4 @@ Todos os mudanças notáveis neste projeto são documentadas neste arquivo.
 
 ### Notes
 - Requer `pkexec` e um agente gráfico Polkit ativo (ex.: polkit-gnome-authentication-agent-1).
-- Para compilar a GUI: `cd gui && CGO_CFLAGS="-w" go build -o protecao-gui .`
+- **Nota:** Esta versão em Go (GTK3) foi substituída pela stack Python+React+Electron na v0.1.5.

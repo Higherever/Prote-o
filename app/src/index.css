@@ -1,14 +1,15 @@
 /**
- * CSS Global — Equivalente ao gui/ui/css.go
+ * CSS Global — Design System do Proteção GUI
  *
- * Mesmo tema visual: fundo #f4f5f5, acentos azuis #2563eb,
- * botões brancos com borda azul, cantos arredondados 12px.
+ * Tema Dark Premium: fundo #3c3b46, texto #f7f7f7,
+ * acentos azuis #60a5fa, botões estilo Wibushi (#515d7d).
  *
- * Aprimoramentos:
+ * Recursos:
  * - Google Font Inter
  * - Glassmorphism nos cards
  * - Transições suaves
  * - Micro-animações
+ * - Animação de preenchimento lateral nos botões
  */
 
 /* ===== Reset & Base ===== */

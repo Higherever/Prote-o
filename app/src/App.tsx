@@ -1,14 +1,12 @@
 /**
- * App.tsx — Equivalente ao gui/ui/window.go
+ * App.tsx — Componente principal do Proteção GUI
  *
  * Gerencia o layout principal e as 3 fases da aplicação:
  * Fase 1: Boas-vindas (5 segundos + fade-out)
- * Fase 2: Opções (3 botões)
- * Fase 3: Progresso (GIF + status em tempo real)
+ * Fase 2: Opções (3 botões estilo Wibushi)
+ * Fase 3: Progresso (Loading26 + status em tempo real via WebSocket)
  *
- * O fundo com vagalumes é renderizado permanentemente atrás de tudo.
- *
- * CORREÇÃO: WebSocket conectado UMA VEZ no nível do App (não dentro de Progress)
+ * WebSocket conectado UMA VEZ no nível do App (não dentro de Progress)
  * para evitar conexões duplicadas no React StrictMode.
  */
 

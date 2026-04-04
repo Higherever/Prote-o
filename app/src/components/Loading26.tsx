@@ -11,14 +11,10 @@ const Loading26: React.FC<Loading26Props> = ({
   color = 'var(--color-primary)', 
   speed = '2.6s' 
 }) => {
-  const containerStyles: React.CSSProperties = {
-    // @ts-ignore
+  const containerStyles: React.CSSProperties & Record<string, string> = {
     '--uib-size': `${size}px`,
-    // @ts-ignore
     '--uib-color': color,
-    // @ts-ignore
     '--uib-speed': speed,
-    // @ts-ignore
     '--uib-dot-size': `calc(${size}px * 0.23)`,
     position: 'relative',
     display: 'flex',

@@ -1,14 +1,12 @@
 /**
- * Progress — Equivalente ao gui/ui/progress.go
+ * Progress — Tela de progresso (Fase 3)
  *
- * Tela de progresso (Fase 3):
- * - Carrega Loop.gif como animação central (fallback: spinner CSS)
+ * - Exibe componente Loading26 (SVG animado) durante execução
  * - Texto "Aguarde a instalação, estamos trabalhando por você"
  * - Recebe dados do WebSocket via props (conectado no App.tsx)
  * - Ao finalizar: mostra sucesso ou erro
  *
- * CORREÇÃO: Não cria mais sua própria conexão WebSocket.
- * Recebe os dados via props do App.tsx para evitar duplicação.
+ * WebSocket recebido via props do App.tsx (evita duplicação no StrictMode).
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -32,7 +30,6 @@ export default function Progress({ funcao, ws }: ProgressProps) {
     'Aguarde a instalação, estamos trabalhando por você'
   );
   const [erroMensagem, setErroMensagem] = useState<string | null>(null);
-  const [gifCarregado, setGifCarregado] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   // Filtra apenas mensagens de output do script
