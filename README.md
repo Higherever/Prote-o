@@ -1,99 +1,86 @@
 # 🛡️ Proteção Completa — CachyOS (Gaming Safe)
 
-O **Proteção** é uma solução robusta para endurecimento de segurança no CachyOS/Arch Linux, projetada para ser 100% compatível com jogos online (Steam, Epic, BattlEye, EAC) enquanto protege sua privacidade e integridade do sistema.
+### Sinta-se em casa, sinta-se seguro.🎮
 
-Esta nova versão conta com uma interface moderna em **Electron + React** e um backend potente em **Python (FastAPI)** que gerencia a execução segura do script de instalação.
+O **Proteção** não é apenas um script de segurança. É o seu **escudo digital invisível**, projetado para que você possa focar no que realmente importa: **sua diversão e produtividade**, sem preocupações com invasores ou exposição de dados.
 
----
-
-## 🚀 O que o projeto faz?
-
-O sistema atua em quatro frentes principais de forma automatizada:
-
-| Camada | Funcionalidade | Gaming Safe? |
-|:--- |:--- |:---:|
-| **🌐 Cloudflare WARP** | Oculta seu IP real e criptografa o tráfego DNS. | ✅ Sim |
-| **🛡️ nftables Firewall** | Firewall moderno com política DROP restritiva, pré-configurado para portas Steam/Blizzard/Epic. | ✅ Sim |
-| **⚙️ Kernel Hardening** | Ajustes de sysctl para proteção contra ataques de memória e ptrace, sem quebrar Anti-Cheats. | ✅ Sim |
-| **🚫 Fail2Ban** | Proteção ativa contra ataques de dicionário e brute-force em serviços locais. | ✅ Sim |
-
-### 🎨 Interface Gráfica (GUI) v2.0.0
-A interface foi totalmente remodelada para uma experiência **Premium** e **High-End**:
-
-1.  **Welcome & Fade-out**: Transições suaves e introdução minimalista.
-2.  **Premium Options**: Botões estilizados com animação de preenchimento dinâmico (estilo Wibushi).
-3.  **Dark Mode Nativo**: Interface otimizada para o tema escuro (`#3c3b46`) para reduzir o cansaço visual.
-4.  **Progresso em Tempo Real**: Acompanhamento via WebSocket com a nova animação `Loading26` (SVG Jelly Ooze) e logs detalhados do backend.
-5.  **Performance Otimizada**: Removidas dependências pesadas (`cobe`, `motion`) para garantir um carregamento instantâneo.
+Desenvolvido especialmente para a comunidade **CachyOS**, ele blinda seu sistema com camadas de elite, mantendo 100% de compatibilidade com todos os seus jogos (Steam, Epic, BattlEye, EAC).
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## 🗺️ Seu Mapa de Proteção (Como Funciona?)
 
-O projeto utiliza uma stack moderna para garantir performance e facilidade de manutenção:
+Visualizamos a segurança como um castelo. Antes de qualquer ameaça tocar seus arquivos ou seus jogos, ela precisa passar por quatro guardiões incansáveis:
 
-*   **Frontend**: [React 19](https://react.dev/) com [TypeScript](https://www.typescriptlang.org/) e [Vite](https://vitejs.dev/).
-*   **Desktop Shell**: [Electron 35](https://www.electronjs.org/) para uma experiência de aplicativo nativo.
-*   **Backend**: [Python 3.14+](https://www.python.org/) com [FastAPI](https://fastapi.tiangolo.com/) e WebSockets para comunicação bidirecional.
-*   **Script Core**: Bash especializado para Arch Linux / CachyOS com sistema de logs cumulativos.
-*   **Segurança**: Integração com **PolicyKit (pkexec)** para elevação de privilégios segura.
-
----
-
-## 📋 Pré-requisitos (CachyOS / Arch)
-
-Certifique-se de possuir as ferramentas básicas instaladas:
-
-```bash
-# Instalar dependências essenciais
-sudo pacman -S --needed base-devel git nodejs npm python python-pip python-virtualenv polkit
+```mermaid
+graph TD
+    User((Você / Jogador)) -- "Desejo: Paz & Diversão" --> Shield{Escudo Proteção}
+    
+    subgraph Defesa["Camadas de Defesa Ativas"]
+        L1[1. Cloudflare WARP <br/><i>Torna seu IP e DNS invisíveis</i>]
+        L2[2. Firewall nftables <br/><i>O muro que bloqueia acessos indevidos</i>]
+        L3[3. Kernel Hardening <br/><i>Blindagem do cérebro do sistema</i>]
+        L4[4. Fail2Ban <br/><i>Expulsão automática de curiosos insistentes</i>]
+        
+        L1 --> L2 --> L3 --> L4
+    end
+    
+    L4 --> Internet[Mundo Exterior / Internet]
+    Internet -- "Tentativa de Invasão / Rastreio" --> Shield
 ```
 
 ---
 
-## 📥 Como Usar (Passo a Passo)
+## 🌟 Por que usar o Proteção?
 
-Siga os comandos abaixo um de cada vez ou cole o bloco completo no seu terminal:
+Em um mundo digital cada vez mais exposto, o simples ato de jogar pode revelar seu IP e localização para estranhos. Veja como nós resolvemos isso:
 
-### 1. Clonar e Acessar
+| O Medo | Nossa Proteção | Benefício Real |
+|:--- |:--- |:--- |
+| **Exposição de IP** | Cloudflare WARP | Ninguém sabe de onde você está conectado. |
+| **Ataque de Invasão** | nftables Firewall | Invasores batem na porta e não recebem resposta. |
+| **Falhas de Sistema** | Kernel Hardening | Blindagem de memória contra malwares modernos. |
+| **Brute Force** | Fail2Ban | Quem tentar adivinhar sua senha é expulso na hora. |
+
+---
+
+## 🎨 Uma Experiência Premium (GUI v2.0.0)
+
+Acreditamos que segurança também deve ser bonita. Nossa interface gráfica foi desenhada conforme o padrão **UI/UX Pro Max**:
+- **Design de Vidro (Glassmorphism):** Uma interface translúcida e moderna que respira com o sistema.
+- **Deep Space Dark:** Tons escuros profundos que protegem seus olhos durante as jogatinas noturnas.
+- **Acompanhamento Real:** Veja cada passo da instalação em tempo real com animações fluidas.
+
+---
+
+## 🚀 Comece em Segundos
+
+Siga os passos simples abaixo para ativar seu escudo:
+
 ```bash
+# 1. Baixe o projeto
 git clone https://github.com/Higherever/Prote-o.git && cd Prote-o/app
-```
 
-### 2. Configurar Ambiente Python (Backend)
-```bash
+# 2. Prepare o motor (Python)
 python3 -m venv backend/venv && \
 backend/venv/bin/pip install -r backend/requirements.txt -q
-```
 
-### 3. Instalar e Compilar Frontend (React + Electron)
-```bash
+# 3. Monte a cabine (Frontend)
 npm install --silent && npm run build
-```
 
-### 4. Executar a Proteção
-```bash
+# 4. Decole!
 electron .
 ```
 
-> **Dica**: Após a primeira instalação, você só precisará executar `electron .` dentro da pasta `app/` para abrir o programa.
+> **Dica de mestre**: Uma vez instalado, basta entrar na pasta `app/` e rodar `electron .` para gerenciar seu escudo.
 
 ---
 
-## 📊 Sistema de Logs
+## 📊 Transparência Total (Logs)
 
-O projeto mantém um histórico detalhado para facilitar a depuração:
-*   **Logs da Interface (Frontend)**: Localizados em `logs/logFront/` (mantém os últimos 10 logs).
-*   **Logs do Instalador (Script)**: Localizados em `logs/logBack/` (logs detalhados de cada execução).
-
----
-
-## 📞 Suporte e Comandos Úteis
-
-Se você precisar gerenciar os serviços manualmente:
-*   Status do WARP: `warp-cli status`
-*   Regras de Firewall: `sudo nft list ruleset`
-*   Status do Hardening: `sysctl kernel.yama.ptrace_scope`
+Você está sempre no controle. Tudo o que o sistema faz fica registrado para sua conferência:
+- `logs/logFront/`: Histórico do que você vê na tela (Últimos 10).
+- `logs/logBack/`: Cada detalhe técnico do que foi instalado ou configurado.
 
 ---
-*Desenvolvido com foco em performance e segurança para a comunidade CachyOS.* 🛡️🎮
+*Criado com ❤️ por gamers, para gamers. Sinta-se seguro, jogue com alma.* 🛡️🎮
