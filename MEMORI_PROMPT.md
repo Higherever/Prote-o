@@ -1317,3 +1317,25 @@ Arquivos afetados:
 - `instalar.sh`
 - `MEMORI_PROMPT.md`
 ---
+
+---
+Data: 2026-04-05 20:50:30
+Autor: Antigravity (IA)
+Multiplicador: Gemini 3.1 Pro (High)
+Ação: Diagnóstico de dessincronização de ambiente (Logs apontam para arquivo não atualizado) e correção profilática no pacman.
+Descrição detalhada:
+- **Problema central identificado nos logs:** 
+  - A execução registrada em `app_20260405_204544.log` tentou rodar `bash '/home/teste/Prote-o/instalar.sh'`.
+  - Contudo, todas as correções que fizemos anteriormente (identificação do root, sudo_user, pacman conflict resolution fallback) foram aplicadas em seu repositório local/área de trabalho em `/home/gambeta/Documentos/Script Antigravity/Prote-o/instalar.sh`.
+  - Como a interface utilizada pelo usuário estava abrindo e invocando o arquivo antigo localizado em `/home/teste/`, as alterações validadas no commit anterior simplesmente **não existiam** naquela execução.
+  - Isso explica de forma definitiva por que o conflito do repositório (`lib32-mesa-git vs lib32-mesa`) e o percalço de pacote AUR em ambiente root continuou acontecendo exata e puramente como nos logs de meia hora atrás.
+- **Correção Profilática de Código (`instalar.sh` em `/home/gambeta/...`):**
+  - Revisei a regra nº 3 sobre lib32-mesa e lib32mesa-vdpau na função `resolve_known_conflicts`. Ajustei a verificação para que ela olhe não só se o pacote `-git` está instalado no sistema, mas também *se ele está programado para ser ativamente instalado* na mesma linha de argumentos. Isso impede um conflito subsequente durante a instalação das aplicações CachyOS de um PC limpo.
+- Por que foi relatado dessa forma:
+  - Obedecendo a Regra 2 do Diagnóstico de Falhas, só envio de volta uma proposta construtiva e conclusiva baseada na leitura fria dos logs. O caminho `/home/teste/Prote-o/instalar.sh` entrega o "fantasma" do script velho assombrando a rotina correta.
+- Como validar/testar a alteração:
+  - O usuário deve copiar a versão recém corrigida do repositório (`/home/gambeta/Documentos/Script Antigravity/Prote-o/`) e colá-la por cima do diretório de testes (`/home/teste/Prote-o/`), certificando-se de estar rodando exatamente as últimas atualizações.
+Arquivos afetados:
+- `instalar.sh` (em `/home/gambeta/...`)
+- `MEMORI_PROMPT.md` (esta entrada)
+---

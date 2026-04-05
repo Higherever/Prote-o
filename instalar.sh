@@ -220,20 +220,30 @@ resolve_known_conflicts() {
         fi
     done
 
+    # Verificar se lib32-mesa-git está instalado ou se será instalado
+    local will_install_git=false
+    if pacman -Q "lib32-mesa-git" &>/dev/null; then
+        will_install_git=true
+    else
+        for p in "${packages_to_install[@]}"; do
+            if [[ "$p" == "lib32-mesa-git" ]]; then
+                will_install_git=true
+                break
+            fi
+        done
+    fi
+
     # Remover pacotes lib32 que conflitam quando usando -git
     # lib32-mesa-vdpau e lib32-libva-mesa-driver às vezes conflitam com lib32-mesa-git
-    if pacman -Q "lib32-mesa-git" &>/dev/null; then
-        local -a maybe_conflict=(lib32-mesa-vdpau)
+    if [[ "$will_install_git" == true ]]; then
+        local -a maybe_conflict=(lib32-mesa-vdpau lib32-libva-mesa-driver)
         for cpkg in "${maybe_conflict[@]}"; do
-            # Se o pacote -git já provê essa funcionalidade, não instalar o separado
-            if pacman -Qi "lib32-mesa-git" 2>/dev/null | grep -q "Fornece.*$cpkg"; then
-                for i in "${!packages_to_install[@]}"; do
-                    if [[ "${packages_to_install[i]}" == "$cpkg" ]]; then
-                        log_info "$cpkg já fornecido por lib32-mesa-git. Removendo da lista." >&2
-                        unset 'packages_to_install[i]'
-                    fi
-                done
-            fi
+            for i in "${!packages_to_install[@]}"; do
+                if [[ "${packages_to_install[i]}" == "$cpkg" ]]; then
+                    log_warn "$cpkg conflita com lib32-mesa-git. Removendo da lista." >&2
+                    unset 'packages_to_install[i]'
+                fi
+            done
         done
     fi
 
