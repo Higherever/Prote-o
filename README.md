@@ -55,24 +55,13 @@ Acreditamos que segurança também deve ser bonita. Nossa interface gráfica foi
 
 ## 🚀 Comece em Segundos
 
-Siga os passos simples abaixo para ativar seu escudo:
+Copie e cole a linha abaixo no seu terminal para baixar, preparar e abrir o seu escudo instantaneamente:
 
 ```bash
-# 1. Baixe o projeto
-git clone https://github.com/Higherever/Prote-o.git && cd Prote-o/app
-
-# 2. Prepare o motor (Python)
-python3 -m venv backend/venv && \
-backend/venv/bin/pip install -r backend/requirements.txt -q
-
-# 3. Monte a cabine (Frontend)
-npm install --silent && npm run build
-
-# 4. Decole!
-electron .
+git clone https://github.com/Higherever/Prote-o.git && cd Prote-o && bash iniciar.sh
 ```
 
-> **Dica de mestre**: Uma vez instalado, basta entrar na pasta `app/` e rodar `electron .` para gerenciar seu escudo.
+> **Dica de mestre**: Em utilizações futuras, basta entrar na pasta `Prote-o` e redigitar `bash iniciar.sh` para que a interface se abra como mágica, sem precisar realizar instalações recorrentes.
 
 ---
 

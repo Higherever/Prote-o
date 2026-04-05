@@ -99,11 +99,9 @@ run_cmd() {
         CMD_RC=0
         return 0
     fi
-    set +e
-    local out
-    out=$("${cmd[@]}" 2>&1)
-    local rc=$?
-    set -e
+    local out=""
+    local rc=0
+    out=$("${cmd[@]}" 2>&1) || rc=$?
     CMD_OUTPUT="$out"
     CMD_RC=$rc
     printf '%s
@@ -112,7 +110,7 @@ run_cmd() {
     if [ $rc -ne 0 ]; then
         printf '[%s] ERRO: %s\nSaída:\n%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$desc" "$out" >> "$TEMP_LOG"
     fi
-    return $rc
+    return 0
 }
 
 # Lista simples de conflitos conhecidos (remover antes de instalar a versão oficial)
@@ -470,9 +468,9 @@ install_cloudflare_warp() {
     # Registrar e conectar — tentar modo não interativo quando possível
     if command -v warp-cli &>/dev/null; then
         set +e
-        yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
-        warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
-        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli --accept-tos registration new 2>&1 | tee -a "$TEMP_LOG" || true
+        warp-cli --accept-tos mode warp 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli --accept-tos connect 2>&1 | tee -a "$TEMP_LOG" || true
         set -e
     fi
 
@@ -524,20 +522,27 @@ instalar_seguranca() {
     if [ "${DRY_RUN}" = true ]; then
         log_info "DRY-RUN: pular comandos 'warp-cli registration/mode/connect' (simulação)."
     else
-        if ! warp-cli status 2>/dev/null | grep -qi "registration\|registered\|connected"; then
+        if ! warp-cli --accept-tos status 2>/dev/null | grep -qiE "status update: (connected|disconnected)"; then
             log_info "Registrando o cliente WARP neste sistema (não-interativo quando possível)."
             set +e
-            yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
+            yes | warp-cli --accept-tos registration new 2>&1 | tee -a "$TEMP_LOG" || true
             set -e
         fi
         log_info "Aplicando modo WARP e iniciando conexão."
-        warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
-        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
-        sleep 2
-        if warp-cli status 2>/dev/null | grep -qi "connected"; then
+        warp-cli --accept-tos mode warp 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli --accept-tos connect 2>&1 | tee -a "$TEMP_LOG" || true
+        
+        # Espera conectar (até 10 segundos)
+        for _ in {1..10}; do
+            if warp-cli --accept-tos status 2>/dev/null | grep -qi "connected"; then break; fi
+            sleep 1
+        done
+        
+        if warp-cli --accept-tos status 2>/dev/null | grep -qi "connected"; then
             log_success "WARP configurado e conectado."
         else
-            log_error "WARP não confirmou conexão após a configuração. Saída registrada no log." 
+            log_error "WARP não confirmou conexão. Último status:"
+            warp-cli --accept-tos status 2>&1 | tee -a "$TEMP_LOG" || true
             return 1
         fi
     fi
@@ -722,7 +727,7 @@ verificar_status() {
     echo ""
     echo -e "${CYAN}─── Cloudflare WARP ───${NC}"
     if command -v warp-cli &>/dev/null; then
-        WARP_STATUS=$(warp-cli status 2>/dev/null | head -5 || echo "Não conectado")
+        WARP_STATUS=$(warp-cli --accept-tos status 2>/dev/null | head -5 || echo "Não conectado")
     else
         WARP_STATUS="warp-cli não está instalado"
     fi
