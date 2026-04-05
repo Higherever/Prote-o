@@ -470,9 +470,9 @@ install_cloudflare_warp() {
     # Registrar e conectar — tentar modo não interativo quando possível
     if command -v warp-cli &>/dev/null; then
         set +e
-        warp-cli registration new --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
         warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
-        warp-cli connect --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
         set -e
     fi
 
@@ -527,12 +527,12 @@ instalar_seguranca() {
         if ! warp-cli status 2>/dev/null | grep -qi "registration\|registered\|connected"; then
             log_info "Registrando o cliente WARP neste sistema (não-interativo quando possível)."
             set +e
-            warp-cli registration new --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
+            yes | warp-cli registration new 2>&1 | tee -a "$TEMP_LOG" || true
             set -e
         fi
         log_info "Aplicando modo WARP e iniciando conexão."
         warp-cli mode warp 2>&1 | tee -a "$TEMP_LOG" || true
-        warp-cli connect --accept-tos 2>&1 | tee -a "$TEMP_LOG" || true
+        yes | warp-cli connect 2>&1 | tee -a "$TEMP_LOG" || true
         sleep 2
         if warp-cli status 2>/dev/null | grep -qi "connected"; then
             log_success "WARP configurado e conectado."

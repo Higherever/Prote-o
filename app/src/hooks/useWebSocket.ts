@@ -22,7 +22,7 @@ export function useWebSocket() {
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<WSMessage[]>([]);
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const connect = useCallback(() => {
     // Limpa timer anterior
