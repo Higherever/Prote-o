@@ -83,6 +83,57 @@ interactive_read() {
     exec > >(tee -a "$TEMP_LOG") 2>&1
 }
 
+# ═══════════════════════════════════════════════
+# Detecção do usuário real (resolve pkexec que não define SUDO_USER)
+# ═══════════════════════════════════════════════
+detectar_usuario_real() {
+    # 1. SUDO_USER (se veio via sudo)
+    if [[ -n "${SUDO_USER:-}" ]] && [[ "$SUDO_USER" != "root" ]]; then
+        echo "$SUDO_USER"
+        return 0
+    fi
+    # 2. PKEXEC_UID (definida pelo pkexec)
+    if [[ -n "${PKEXEC_UID:-}" ]] && [[ "$PKEXEC_UID" != "0" ]]; then
+        local user_name
+        user_name=$(getent passwd "$PKEXEC_UID" 2>/dev/null | cut -d: -f1)
+        if [[ -n "$user_name" ]]; then
+            echo "$user_name"
+            return 0
+        fi
+    fi
+    # 3. LOGNAME
+    if [[ -n "${LOGNAME:-}" ]] && [[ "$LOGNAME" != "root" ]]; then
+        echo "$LOGNAME"
+        return 0
+    fi
+    # 4. Fallback: quem está logado na sessão gráfica
+    local logged
+    logged=$(who 2>/dev/null | head -1 | awk '{print $1}')
+    if [[ -n "$logged" ]] && [[ "$logged" != "root" ]]; then
+        echo "$logged"
+        return 0
+    fi
+    # 5. Último recurso: listar homes
+    local home_user
+    home_user=$(ls /home/ 2>/dev/null | head -1)
+    if [[ -n "$home_user" ]]; then
+        echo "$home_user"
+        return 0
+    fi
+    echo ""
+    return 1
+}
+
+REAL_USER=""
+if [[ ${EUID} -eq 0 ]]; then
+    REAL_USER=$(detectar_usuario_real) || true
+    if [[ -n "$REAL_USER" ]]; then
+        log_info "Usuário real detectado: $REAL_USER (via pkexec/sudo)"
+    else
+        log_warn "Não foi possível detectar usuário real. Comandos AUR podem falhar."
+    fi
+fi
+
 # Execução segura com captura de saída para análise de erros
 CMD_OUTPUT=""
 CMD_RC=0
@@ -112,26 +163,80 @@ run_cmd() {
     return 0
 }
 
-# Lista simples de conflitos conhecidos (remover apenas se necessário)
+# Resolução inteligente de conflitos de drivers mesa (-git vs estável)
+# Regras:
+#   1. Se o usuário já tem o driver -git instalado → mantém -git, remove estável da lista
+#   2. Se o usuário já tem o driver estável instalado → mantém estável, não muda nada
+#   3. Se não tem nenhum → prefere -git (melhor desempenho no CachyOS)
 resolve_known_conflicts() {
     local -a packages_to_install=("$@")
-    local -a known=(lib32-mesa-git)
-    
-    for pkg in "${known[@]}"; do
-        # Só remove se o conflito for explícito com um pacote que QUEREMOS instalar
-        if pacman -Q "$pkg" &>/dev/null; then
-            if [[ " ${packages_to_install[*]} " =~ " lib32-mesa " ]]; then
-                log_warn "O pacote $pkg está instalado e conflita com lib32-mesa."
-                log_info "Preferindo manter seu driver -git atual para melhor desempenho."
-                # Removemos lib32-mesa da lista de instalação para preservar o driver git do usuário
+
+    # Pares de conflito: "pacote-git pacote-estável"
+    local -a conflict_pairs=(
+        "lib32-mesa-git lib32-mesa"
+        "mesa-git mesa"
+    )
+
+    for pair in "${conflict_pairs[@]}"; do
+        local git_pkg="${pair%% *}"
+        local stable_pkg="${pair##* }"
+
+        # Verificar se os pacotes estão na lista de instalação
+        local has_stable_in_list=false
+        for p in "${packages_to_install[@]}"; do
+            if [[ "$p" == "$stable_pkg" ]]; then
+                has_stable_in_list=true
+                break
+            fi
+        done
+        # Se o pacote estável não está na lista, nada a resolver
+        [[ "$has_stable_in_list" == false ]] && continue
+
+        local git_installed=false
+        local stable_installed=false
+        pacman -Q "$git_pkg" &>/dev/null && git_installed=true
+        pacman -Q "$stable_pkg" &>/dev/null && stable_installed=true
+
+        if [[ "$git_installed" == true ]]; then
+            # Caso 1: Driver -git já instalado → remover estável da lista
+            log_warn "$git_pkg já está instalado e conflita com $stable_pkg." >&2
+            log_info "Preservando driver -git para melhor desempenho." >&2
+            for i in "${!packages_to_install[@]}"; do
+                if [[ "${packages_to_install[i]}" == "$stable_pkg" ]]; then
+                    unset 'packages_to_install[i]'
+                fi
+            done
+        elif [[ "$stable_installed" == true ]]; then
+            # Caso 2: Driver estável já instalado → manter como está
+            log_info "Driver estável $stable_pkg detectado. Mantendo versão atual." >&2
+        else
+            # Caso 3: Nenhum instalado → preferir -git
+            log_info "Nenhuma versão de $stable_pkg detectada. Preferindo $git_pkg." >&2
+            for i in "${!packages_to_install[@]}"; do
+                if [[ "${packages_to_install[i]}" == "$stable_pkg" ]]; then
+                    packages_to_install[i]="$git_pkg"
+                fi
+            done
+        fi
+    done
+
+    # Remover pacotes lib32 que conflitam quando usando -git
+    # lib32-mesa-vdpau e lib32-libva-mesa-driver às vezes conflitam com lib32-mesa-git
+    if pacman -Q "lib32-mesa-git" &>/dev/null; then
+        local -a maybe_conflict=(lib32-mesa-vdpau)
+        for cpkg in "${maybe_conflict[@]}"; do
+            # Se o pacote -git já provê essa funcionalidade, não instalar o separado
+            if pacman -Qi "lib32-mesa-git" 2>/dev/null | grep -q "Fornece.*$cpkg"; then
                 for i in "${!packages_to_install[@]}"; do
-                    if [[ "${packages_to_install[i]}" == "lib32-mesa" ]]; then
+                    if [[ "${packages_to_install[i]}" == "$cpkg" ]]; then
+                        log_info "$cpkg já fornecido por lib32-mesa-git. Removendo da lista." >&2
                         unset 'packages_to_install[i]'
                     fi
                 done
             fi
-        fi
-    done
+        done
+    fi
+
     # Retorna a lista filtrada (como string)
     echo "${packages_to_install[*]}"
 }
@@ -383,39 +488,40 @@ configuracao_completa() {
 #     FUNÇÃO: Garantir paru ou yay disponível
 # ═══════════════════════════════════════════════
 garantir_aur_helper() {
-    if command -v paru &>/dev/null || command -v yay &>/dev/null; then
+    # Prioridade: yay > paru (conforme preferência do projeto)
+    if command -v yay &>/dev/null || command -v paru &>/dev/null; then
         return 0
     fi
     echo ""
-    log_warn "Os gerenciadores de pacotes paru e yay não estão instalados."
-    interactive_read "Deseja instalar o paru para continuar? (s/n): " resposta
+    log_warn "Os gerenciadores de pacotes yay e paru não estão instalados."
+    interactive_read "Deseja instalar o yay para continuar? (s/n): " resposta
     if [[ "$resposta" =~ ^[Ss]$ ]]; then
-        log_info "Instalando paru pelo AUR."
+        log_info "Instalando yay pelo AUR."
         if [ "${DRY_RUN}" = true ]; then
-            log_info "DRY-RUN: pular instalação do paru (simulação)."
+            log_info "DRY-RUN: pular instalação do yay (simulação)."
             return 0
         fi
         run_pacman -S --noconfirm --needed base-devel git
         local tmpdir
         tmpdir=$(mktemp -d)
-        git clone https://aur.archlinux.org/paru.git "$tmpdir/paru"
+        git clone https://aur.archlinux.org/yay.git "$tmpdir/yay"
         if [[ ${EUID} -eq 0 ]]; then
-            if [[ -z ${SUDO_USER:-} ]]; then
-                log_error "Execute o script como usuário normal. makepkg não deve rodar como root."
+            if [[ -z "${REAL_USER:-}" ]]; then
+                log_error "Não foi possível detectar o usuário real. makepkg não deve rodar como root."
                 rm -rf "$tmpdir"
                 return 1
             fi
-            sudo -u "$SUDO_USER" bash -lc "cd '$tmpdir/paru' && makepkg -si --noconfirm"
+            sudo -u "$REAL_USER" bash -lc "cd '$tmpdir/yay' && makepkg -si --noconfirm"
         else
             (
-                cd "$tmpdir/paru"
+                cd "$tmpdir/yay"
                 makepkg -si --noconfirm
             )
         fi
         rm -rf "$tmpdir"
-        log_success "paru instalado com sucesso."
+        log_success "yay instalado com sucesso."
     else
-        log_error "Instalação cancelada. Não é possível continuar sem paru ou yay."
+        log_error "Instalação cancelada. Não é possível continuar sem yay ou paru."
         return 1
     fi
 }
@@ -427,20 +533,28 @@ aur_install() {
         return 0
     fi
 
+    # Prioridade: yay > paru (conforme definição do projeto)
     local helper=""
-    if command -v paru &>/dev/null; then helper="paru"; fi
-    if command -v yay &>/dev/null && [ -z "$helper" ]; then helper="yay"; fi
+    if command -v yay &>/dev/null; then helper="yay"; fi
+    if [ -z "$helper" ] && command -v paru &>/dev/null; then helper="paru"; fi
 
     if [ -z "$helper" ]; then
         log_error "Nenhum helper AUR disponível para instalar: $*"
         return 1
     fi
 
-    # Se rodando como root (via pkexec), tenta delegar ao usuário que invocou
-    if [[ ${EUID} -eq 0 ]] && [[ -n ${SUDO_USER:-} ]]; then
-        log_info "Delegando instalação AUR para o usuário: $SUDO_USER"
-        run_cmd "$helper -S --noconfirm --needed $*" sudo -u "$SUDO_USER" bash -lc "$helper -S --noconfirm --needed $*"
-        return $CMD_RC
+    # Se rodando como root (via pkexec/sudo), DEVE delegar ao usuário real
+    if [[ ${EUID} -eq 0 ]]; then
+        if [[ -n "${REAL_USER:-}" ]]; then
+            log_info "Delegando instalação AUR para o usuário: $REAL_USER (helper: $helper)"
+            run_cmd "$helper -S --noconfirm --needed $*" sudo -u "$REAL_USER" bash -lc "$helper -S --noconfirm --needed $*"
+            return $CMD_RC
+        else
+            log_error "Impossível instalar pacotes AUR como root sem usuário real detectado."
+            log_error "Pacotes: $*"
+            log_warn "Execute manualmente como usuário normal: $helper -S --needed $*"
+            return 1
+        fi
     fi
 
     run_cmd "$helper -S --noconfirm --needed $*" "$helper" -S --noconfirm --needed "$@"
@@ -655,11 +769,11 @@ instalar_jogos() {
     echo -e "${CYAN}══════════════════════════════════════════════${NC}"
 
     echo ""
-    echo -e "${YELLOW}[1/3]${NC} Verificando AUR helper..."
+    echo -e "${YELLOW}[1/4]${NC} Verificando AUR helper..."
     garantir_aur_helper || return 1
 
     echo ""
-    echo -e "${YELLOW}[2/3]${NC} Instalando drivers e dependências..."
+    echo -e "${YELLOW}[2/4]${NC} Instalando drivers e dependências..."
     log_info "Instalando pacotes de drivers, Vulkan, Wine e utilitários de jogos."
     run_pacman -S --noconfirm --needed \
         amd-ucode \
@@ -690,18 +804,30 @@ instalar_jogos() {
         xf86-video-amdgpu
 
     echo ""
-    echo -e "${YELLOW}[3/3]${NC} Instalando aplicativos (AUR + repos)..."
-    log_info "Instalando launchers e ferramentas complementares via helper AUR."
-    aur_install \
+    echo -e "${YELLOW}[3/4]${NC} Instalando aplicativos (repos oficiais)..."
+    log_info "Instalando launchers e ferramentas disponíveis nos repositórios CachyOS via pacman."
+    run_pacman -S --noconfirm --needed \
         steam \
-        heroic-games-launcher-bin \
         lutris \
         protonup-qt \
         proton-cachyos-slr \
         wine-cachyos-opt \
-        vesktop \
-        google-chrome \
         goverlay
+
+    echo ""
+    echo -e "${YELLOW}[4/4]${NC} Instalando aplicativos (AUR)..."
+    log_info "Instalando pacotes exclusivos do AUR via helper."
+    # Apenas pacotes que NÃO estão nos repositórios oficiais do CachyOS
+    aur_install \
+        heroic-games-launcher-bin \
+        vesktop \
+        google-chrome
+    local aur_rc=$?
+    if [ $aur_rc -ne 0 ]; then
+        log_warn "Alguns pacotes AUR não puderam ser instalados automaticamente (rc=$aur_rc)."
+        log_warn "Você pode instalá-los manualmente após o script finalizar."
+        # Não retorna erro fatal — os pacotes AUR são complementares
+    fi
 
     echo ""
     log_success "Instalação de ferramentas e dependências para jogos concluída."
@@ -738,8 +864,8 @@ verificar_status() {
         log_error "Não foi possível listar regras nftables (rc=$CMD_RC). Saída: $CMD_OUTPUT"
         log_warn "Verifique se o serviço 'nftables' está ativo: sudo systemctl status nftables"
     else
-        if echo "$CMD_OUTPUT" | grep -q "type filter hook input priority 0; policy drop;" \
-           && echo "$CMD_OUTPUT" | grep -q "type filter hook forward priority 0; policy drop;"; then
+        if echo "$CMD_OUTPUT" | grep -qE "type filter hook input priority (0|filter); policy drop;" \
+           && echo "$CMD_OUTPUT" | grep -qE "type filter hook forward priority (0|filter); policy drop;"; then
             log_success "Firewall ativo com política DROP em input e forward."
         else
             log_warn "Firewall parece não aplicar a política DROP esperada. Conteúdo do ruleset:\n$CMD_OUTPUT"

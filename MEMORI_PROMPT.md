@@ -1248,3 +1248,72 @@ Arquivos afetados:
 - `logs/logFront/*.log` (removidos)
 - `MEMORI_PROMPT.md` (esta entrada)
 ---
+
+---
+Data: 2026-04-05 20:06:00
+Autor: Antigravity (IA)
+Multiplicador: Claude Opus 4.6 (Thinking)
+Ação: Correção de 3 erros + 1 melhoria encontrados nos logs de execução do segundo computador
+Descrição detalhada:
+- **Logs analisados (do segundo computador — CachyOS, COSMIC, Wayland, RX 7600):**
+  - `app_20260405_195230.log` — Opção 1 (Segurança): ✅ OK
+  - `app_20260405_195311.log` — Opção 2 (Jogos): ❌ FALHA
+  - `app_20260405_195341.log` — Opção 3 (Completa): ❌ FALHA parcial
+  - `instalar_20260405_195247.log` — Backend Op1: OK + falso aviso firewall
+  - `instalar_20260405_195324.log` — Backend Op2: ERRO paru root
+  - `instalar_20260405_195358.log` — Backend Op3: ERRO paru root
+
+- **ERRO 1 — CRÍTICO: pkexec não define SUDO_USER:**
+  - Causa: `pkexec` roda como root mas não define `SUDO_USER`. A função `aur_install()` dependia de `SUDO_USER` para delegar ao usuário normal.
+  - Resultado: `paru` rodava como root → "erro: não é possível instalar o pacote AUR como root"
+  - Solução: Criada função `detectar_usuario_real()` que verifica, em ordem: `SUDO_USER` → `PKEXEC_UID` (via getent) → `LOGNAME` → `who` → `/home/`. O resultado é armazenado em `REAL_USER` e usado em `aur_install()` e `garantir_aur_helper()`.
+
+- **ERRO 2 — MÉDIO: Conflito lib32-mesa-git vs lib32-mesa:**
+  - Causa: O computador de teste tem `lib32-mesa-git` instalado (versão -git customizada do CachyOS). O script tentava instalar `lib32-mesa` (versão estável), causando conflito irreconciliável.
+  - Solução: Reescrita completa de `resolve_known_conflicts()` com 3 regras:
+    1. Se -git está instalado → remove estável da lista (preserva -git)
+    2. Se estável está instalado → mantém estável
+    3. Se nenhum está instalado → prefere -git (melhor desempenho CachyOS)
+  - Também trata conflitos de `lib32-mesa-vdpau` quando `lib32-mesa-git` já fornece.
+
+- **ERRO 3 — MÉDIO: Falso aviso na verificação do firewall:**
+  - Causa: O script escrevia `priority 0;` no nftables.conf, mas `nft list table` exibe como `priority filter;` (nome simbólico). O `grep` nunca encontrava match.
+  - Solução: Alterado grep para usar regex `-qE "priority (0|filter); policy drop;"`.
+
+- **MELHORIA: Reorganização de prioridade de pacotes e helpers:**
+  - Prioridade de instalação: Pacman (repos CachyOS) → YAY → Paru
+  - Separação na `instalar_jogos()`: agora tem 4 etapas em vez de 3
+    - [2/4] Drivers via pacman
+    - [3/4] Aplicativos dos repos oficiais via pacman (steam, lutris, protonup-qt, etc.)
+    - [4/4] Pacotes exclusivos AUR (heroic-games-launcher-bin, vesktop, google-chrome)
+  - Falha do AUR não é mais fatal — exibe aviso em vez de abortar toda a instalação
+  - `garantir_aur_helper()` agora instala `yay` em vez de `paru` como padrão
+
+- Validação:
+  - `bash -n instalar.sh` → SINTAXE OK ✅
+
+Arquivos afetados:
+- `instalar.sh` (4 alterações: detectar_usuario_real, aur_install, resolve_known_conflicts, verificar_status)
+- `MEMORI_PROMPT.md` (esta entrada)
+Referências:
+- Logs de erro: `/home/gambeta/Downloads/TransferNow-20260405hpSbSCwO/`
+- Erro original: "erro: não é possível instalar o pacote AUR como root"
+---
+
+---
+Data: 2026-04-05 20:17:00
+Autor: Antigravity (IA)
+Multiplicador: Gemini 3.1 Pro (Low)
+Ação: Correção na captura de strings da função pacman
+Descrição detalhada:
+- O que foi alterado:
+  - Adicionado direcionamento de stderr (`>&2`) às funções de output `log_warn` e `log_info` disparadas por dentro da rotina `resolve_known_conflicts`.
+- Por que foi alterado:
+  - A rotina pai `run_pacman` lia do stdout da função de resolução para formatar e isolar pacotes. Os `log_info` recém incluídos vazavam para o stdout e terminavam alimentando o array do `pacman`, inserindo na cli strings literais como "[INFO] Driver estável..." ao invés de nomes pacotes.
+  - Isso gerava um erro Fatal retornando "pacman retornou erro (rc=1)".
+- Como validar/testar a alteração:
+  - Uma nova execução dry-run `--dry-run` vai agora exibir o output limpo para `pacman` e printar as informações diretas com sucesso para o usuário sem corromper instâncias de instalação futuras.
+Arquivos afetados:
+- `instalar.sh`
+- `MEMORI_PROMPT.md`
+---
