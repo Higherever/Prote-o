@@ -104,8 +104,7 @@ run_cmd() {
     out=$("${cmd[@]}" 2>&1) || rc=$?
     CMD_OUTPUT="$out"
     CMD_RC=$rc
-    printf '%s
-' "$out"
+    printf '%s\n' "$out"
     printf '[%s] CMD: %s RC:%d\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${cmd[*]}" "$rc" >> "$TEMP_LOG"
     if [ $rc -ne 0 ]; then
         printf '[%s] ERRO: %s\nSaída:\n%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$desc" "$out" >> "$TEMP_LOG"
@@ -113,24 +112,28 @@ run_cmd() {
     return 0
 }
 
-# Lista simples de conflitos conhecidos (remover antes de instalar a versão oficial)
+# Lista simples de conflitos conhecidos (remover apenas se necessário)
 resolve_known_conflicts() {
+    local -a packages_to_install=("$@")
     local -a known=(lib32-mesa-git)
+    
     for pkg in "${known[@]}"; do
+        # Só remove se o conflito for explícito com um pacote que QUEREMOS instalar
         if pacman -Q "$pkg" &>/dev/null; then
-            log_warn "Pacote conflitante detectado instalado: $pkg — removendo automaticamente para evitar conflito."
-            if [ "${DRY_RUN}" = true ]; then
-                log_info "DRY-RUN: sudo pacman -R --noconfirm $pkg"
-            else
-                run_cmd "remover $pkg" sudo pacman -R --noconfirm "$pkg"
-                if [ $CMD_RC -ne 0 ]; then
-                    log_error "Falha ao remover $pkg (rc=$CMD_RC). Ver arquivo de log para detalhes." 
-                else
-                    log_info "Remoção de $pkg concluída." 
-                fi
+            if [[ " ${packages_to_install[*]} " =~ " lib32-mesa " ]]; then
+                log_warn "O pacote $pkg está instalado e conflita com lib32-mesa."
+                log_info "Preferindo manter seu driver -git atual para melhor desempenho."
+                # Removemos lib32-mesa da lista de instalação para preservar o driver git do usuário
+                for i in "${!packages_to_install[@]}"; do
+                    if [[ "${packages_to_install[i]}" == "lib32-mesa" ]]; then
+                        unset 'packages_to_install[i]'
+                    fi
+                done
             fi
         fi
     done
+    # Retorna a lista filtrada (como string)
+    echo "${packages_to_install[*]}"
 }
 
 # Modo de execução: dry-run
@@ -165,10 +168,26 @@ run_pacman() {
         return 0
     fi
 
-    # Antes: resolver conflitos conhecidos proativamente
-    resolve_known_conflicts
+    # RESOLUÇÃO INTELIGENTE DE DRIVERS:
+    # Filtramos a lista de pacotes para não forçar substituição de drivers -git por estáveis
+    local -a args=("$@")
+    local -a final_packages=()
+    local is_install_cmd=false
+    
+    # Verifica se é um comando de instalação (-S ou --sync)
+    for arg in "${args[@]}"; do
+        if [[ "$arg" =~ ^-.*[S].* ]]; then is_install_cmd=true; break; fi
+    done
 
-    run_cmd "pacman $*" sudo pacman "$@"
+    if [ "$is_install_cmd" = true ]; then
+        local filtered_pkgs
+        filtered_pkgs=$(resolve_known_conflicts "${args[@]}")
+        read -r -a final_packages <<< "$filtered_pkgs"
+    else
+        final_packages=("${args[@]}")
+    fi
+
+    run_cmd "pacman ${final_packages[*]}" sudo pacman "${final_packages[@]}"
     if [ $CMD_RC -ne 0 ]; then
         # Mensagens não-fatais (pacote já instalado / nada para fazer)
         if echo "$CMD_OUTPUT" | grep -qiE "está atualizado|is up to date|nada para fazer|already up-to-date|nothing to do"; then
@@ -176,28 +195,19 @@ run_pacman() {
             return 0
         fi
 
-        # Conflitos de pacotes — tentar resolver automaticamente e reexecutar
+        # Conflitos de pacotes — registrar e sugerir intervenção manual
         if echo "$CMD_OUTPUT" | grep -qi "conflito de pacotes"; then
-            log_warn "Conflito de pacotes detectado. Tentando resolver conflitos conhecidos e reinstalar."
-            resolve_known_conflicts
-            run_cmd "pacman retry $*" sudo pacman "$@"
-            if [ $CMD_RC -ne 0 ]; then
-                log_error "Instalação via pacman falhou após tentativa de resolver conflitos. Saída: $CMD_OUTPUT"
-                return $CMD_RC
-            fi
-            return 0
+            log_error "Conflito de pacotes persistente detectado."
+            log_warn "O sistema não pôde resolver o conflito automaticamente. Saída: $CMD_OUTPUT"
+            return $CMD_RC
         fi
 
         # Falha de download (404) — atualizar base e tentar novamente
         if echo "$CMD_OUTPUT" | grep -qiE "falha ao obter o arquivo|The requested URL returned error|404"; then
             log_warn "Falha de download detectada (possível mirror quebrado). Forçando refresh dos repositórios e tentando novamente."
             run_cmd "pacman -Syy" sudo pacman -Syy --noconfirm
-            run_cmd "pacman retry $*" sudo pacman "$@"
-            if [ $CMD_RC -ne 0 ]; then
-                log_error "Instalação via pacman falhou após refresh (provável problema externo). Saída: $CMD_OUTPUT"
-                return $CMD_RC
-            fi
-            return 0
+            run_cmd "pacman retry ${final_packages[*]}" sudo pacman "${final_packages[@]}"
+            return $CMD_RC
         fi
 
         # Caso geral — registra e propaga o erro
@@ -410,58 +420,35 @@ garantir_aur_helper() {
     fi
 }
 
-# Helper: instalar via paru ou yay
+# Helper: instalar via paru ou yay deleando ao usuário normal se root
 aur_install() {
     if [ "${DRY_RUN}" = true ]; then
         log_info "DRY-RUN: aur_install (simulação): $*"
         return 0
     fi
-    if command -v paru &>/dev/null; then
-        run_cmd "paru -S --noconfirm --needed $*" paru -S --noconfirm --needed "$@"
-        if [ $CMD_RC -ne 0 ]; then
-            log_error "Erro ao instalar via paru: $* (rc=$CMD_RC). Ver log temporário para detalhes."
-            return $CMD_RC
-        fi
-    elif command -v yay &>/dev/null; then
-        run_cmd "yay -S --noconfirm --needed $*" yay -S --noconfirm --needed "$@"
-        if [ $CMD_RC -ne 0 ]; then
-            log_error "Erro ao instalar via yay: $* (rc=$CMD_RC). Ver log temporário para detalhes."
-            return $CMD_RC
-        fi
-    else
+
+    local helper=""
+    if command -v paru &>/dev/null; then helper="paru"; fi
+    if command -v yay &>/dev/null && [ -z "$helper" ]; then helper="yay"; fi
+
+    if [ -z "$helper" ]; then
         log_error "Nenhum helper AUR disponível para instalar: $*"
         return 1
     fi
+
+    # Se rodando como root (via pkexec), tenta delegar ao usuário que invocou
+    if [[ ${EUID} -eq 0 ]] && [[ -n ${SUDO_USER:-} ]]; then
+        log_info "Delegando instalação AUR para o usuário: $SUDO_USER"
+        run_cmd "$helper -S --noconfirm --needed $*" sudo -u "$SUDO_USER" bash -lc "$helper -S --noconfirm --needed $*"
+        return $CMD_RC
+    fi
+
+    run_cmd "$helper -S --noconfirm --needed $*" "$helper" -S --noconfirm --needed "$@"
+    return $CMD_RC
 }
 
 # Instala Cloudflare WARP e aceita automaticamente os termos quando possível
 install_cloudflare_warp() {
-    log_info "Instalando Cloudflare WARP (aceitação automática de termos quando suportado)."
-    garantir_aur_helper || return 1
-    if [ "${DRY_RUN}" = true ]; then
-        log_info "DRY-RUN: instalar cloudflare-warp-bin (simulação)."
-        return 0
-    fi
-
-    if command -v paru &>/dev/null; then
-        set +e
-        paru -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
-        local rc=${PIPESTATUS[0]:-1}
-        set -e
-    elif command -v yay &>/dev/null; then
-        set +e
-        yay -S --noconfirm --needed cloudflare-warp-bin 2>&1 | tee -a "$TEMP_LOG"
-        local rc=${PIPESTATUS[0]:-1}
-        set -e
-    else
-        aur_install cloudflare-warp-bin || return 1
-        rc=0
-    fi
-
-    if [ "${rc:-0}" -ne 0 ]; then
-        log_error "Instalação do cloudflare-warp-bin falhou (rc=${rc}). Ver log para detalhes."
-        return ${rc}
-    fi
 
     run_systemctl enable --now warp-svc || log_warn "Não foi possível habilitar warp-svc (verifique permissões)."
 

@@ -21,19 +21,26 @@ from pathlib import Path
 MAX_LOGS = 10
 
 
+def _get_cmd_output(cmd: list, timeout: int = 2) -> str:
+    """Invoca um comando de sistema e retorna sua saída limpa."""
+    try:
+        return subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, timeout=timeout).strip()
+    except Exception:
+        return "N/A"
+
+
 def _coletar_info_sistema() -> dict:
     """
-    Coleta informações básicas do sistema operacional e ambiente gráfico.
+    Coleta informações técnicas do sistema operacional, hardware e ambiente gráfico.
     Retorna um dicionário com os dados coletados.
     """
     info = {}
 
     # --- Sistema Operacional ---
-    info["os_nome"] = platform.system()  # ex: 'Linux'
-    info["os_release"] = platform.release()  # ex: '6.14.0-1-cachyos'
-    info["os_version"] = platform.version()  # descrição completa
+    info["os_nome"] = platform.system()
+    info["os_release"] = platform.release()
+    info["os_version"] = platform.version()
 
-    # Tenta ler /etc/os-release para nome distro (ex: CachyOS, Arch Linux)
     try:
         os_release_path = Path("/etc/os-release")
         if os_release_path.exists():
@@ -51,34 +58,46 @@ def _coletar_info_sistema() -> dict:
         info["distro_nome"] = "Erro ao ler"
         info["distro_versao"] = "N/A"
 
-    # --- Kernel ---
-    try:
-        info["kernel"] = subprocess.check_output(
-            ["uname", "-r"], text=True, timeout=3
-        ).strip()
-    except Exception:
-        info["kernel"] = platform.release()
+    info["kernel"] = _get_cmd_output(["uname", "-r"])
+    info["arquitetura"] = platform.machine()
 
-    # --- Interface Gráfica: Wayland ou X11 ---
+    # --- Processador (CPU) ---
+    cpu_raw = _get_cmd_output(["lscpu"])
+    if cpu_raw != "N/A":
+        # Extrai o nome do modelo e número de threads
+        model = next((line.split(":", 1)[1].strip() for line in cpu_raw.splitlines() if "Model name:" in line), "Desconhecido")
+        threads = next((line.split(":", 1)[1].strip() for line in cpu_raw.splitlines() if "CPU(s):" in line), "N/A")
+        info["cpu"] = f"{model} ({threads} threads)"
+    else:
+        info["cpu"] = platform.processor() or "Desconhecido"
+
+    # --- Placa de Vídeo (GPU) ---
+    # Tenta obter via lspci (detalhado) ou via glxinfo (se disponível)
+    lspci_gpu = _get_cmd_output(["sh", "-c", "lspci | grep -iE 'vga|3d|display' | cut -d ':' -f3"])
+    if lspci_gpu != "N/A":
+        # Remove redundâncias como [VGA controller] e xargs limpa espaços extras
+        info["gpu"] = lspci_gpu.replace("[VGA controller]", "").strip().split('\n')[0]
+    else:
+        info["gpu"] = "Desconhecida"
+
+    # --- Memória RAM ---
+    mem_total = _get_cmd_output(["sh", "-c", "free -h | grep Mem | awk '{print $2}'"])
+    info["ram"] = f"{mem_total} Total" if mem_total != "N/A" else "Desconhecida"
+
+    # --- Interface Gráfica e Servidor de Display ---
     wayland_display = os.environ.get("WAYLAND_DISPLAY", "")
     xdg_session = os.environ.get("XDG_SESSION_TYPE", "").lower()
-    display = os.environ.get("DISPLAY", "")
+    
+    # Detecção refinada de DE
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", os.environ.get("DESKTOP_SESSION", "Desconhecido")).upper()
+    info["desktop"] = desktop
 
     if wayland_display or xdg_session == "wayland":
-        info["display_server"] = f"Wayland ({wayland_display or xdg_session})"
-    elif display or xdg_session == "x11":
-        info["display_server"] = f"X11 ({display or xdg_session})"
+        # Tenta pegar versão se disponível
+        info["display_server"] = f"Wayland ({wayland_display or 'Active session'})"
     else:
-        info["display_server"] = "Desconhecido (sem DISPLAY nem WAYLAND_DISPLAY)"
-
-    # --- Compositor / Desktop Environment ---
-    info["desktop"] = os.environ.get(
-        "XDG_CURRENT_DESKTOP",
-        os.environ.get("DESKTOP_SESSION", "Desconhecido"),
-    )
-
-    # --- Arquitetura da máquina ---
-    info["arquitetura"] = platform.machine()  # ex: 'x86_64'
+        display = os.environ.get("DISPLAY", "")
+        info["display_server"] = f"X11 ({display or 'Active session'})"
 
     return info
 
@@ -166,6 +185,9 @@ def configurar_logs() -> logging.Logger:
         logger.info("[SISTEMA] === Informações do Ambiente ===")
         logger.info("[SISTEMA] Distribuição : %s %s", info["distro_nome"], info["distro_versao"])
         logger.info("[SISTEMA] Kernel       : %s", info["kernel"])
+        logger.info("[SISTEMA] CPU          : %s", info["cpu"])
+        logger.info("[SISTEMA] GPU          : %s", info["gpu"])
+        logger.info("[SISTEMA] RAM          : %s", info["ram"])
         logger.info("[SISTEMA] OS Base      : %s %s", info["os_nome"], info["os_release"])
         logger.info("[SISTEMA] Arquitetura  : %s", info["arquitetura"])
         logger.info("[SISTEMA] Display/GUI  : %s", info["display_server"])
