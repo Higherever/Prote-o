@@ -3,7 +3,6 @@
 *.swo
 *~
 .DS_Store
-MEMORI_PROMPT.md
 
 # Proteção App specific ignores
 app/node_modules/
