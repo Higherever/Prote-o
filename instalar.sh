@@ -822,15 +822,15 @@ instalar_jogos() {
         protonup-qt \
         proton-cachyos-slr \
         wine-cachyos-opt \
-        goverlay
+        goverlay \
+        heroic-games-launcher-bin \
+        vesktop
 
     echo ""
     echo -e "${YELLOW}[4/4]${NC} Instalando aplicativos (AUR)..."
     log_info "Instalando pacotes exclusivos do AUR via helper."
     # Apenas pacotes que NÃO estão nos repositórios oficiais do CachyOS
     aur_install \
-        heroic-games-launcher-bin \
-        vesktop \
         google-chrome
     local aur_rc=$?
     if [ $aur_rc -ne 0 ]; then

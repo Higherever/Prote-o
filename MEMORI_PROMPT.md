@@ -1339,3 +1339,21 @@ Arquivos afetados:
 - `instalar.sh` (em `/home/gambeta/...`)
 - `MEMORI_PROMPT.md` (esta entrada)
 ---
+
+---
+Data: 2026-04-06 14:55:00
+Autor: Antigravity (IA)
+Multiplicador: Gemini 3.1 Pro (High)
+Ação: Movimentação de pacotes do AUR para repositórios oficiais na função de instalação
+Descrição detalhada:
+- O que foi alterado:
+  - Os pacotes `heroic-games-launcher-bin` e `vesktop` foram removidos da chamada do `aur_install` e adicionados à lista de chamada de instalação do repositório oficial (`run_pacman -S`).
+  - Agora apenas o pacote `google-chrome` fará uso do helper AUR (`yay`/`paru`).
+- Por que foi alterado:
+  - O usuário quis evitar o uso do Paru/Yay sempre que o pacote estivesse nativamente disponível nos repositórios oficiais (neste caso, no repositório do CachyOS), reduzindo compilações e pedidos repetitivos de senha (sudo) por parte do helper do AUR.
+- Como validar/testar a alteração:
+  - Executar o script de instalação de jogos novamente (Opção 2) e constatar que esses aplicativos são instalados como pacote padrão do pacman e o AUR roda com apenas o `google-chrome`.
+Arquivos afetados:
+- `instalar.sh`
+- `MEMORI_PROMPT.md` (esta entrada)
+---
