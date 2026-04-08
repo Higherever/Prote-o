@@ -27,19 +27,19 @@
   --bg-titlebar: rgba(0, 0, 0, 0.4);
   --bg-titlebar-hover: rgba(255, 255, 255, 0.05);
 
-  /* Glassmorphism Tokens */
-  --glass-bg: rgba(255, 255, 255, 0.02);
+  /* Glassmorphism Tokens - OLED Dark Theme ajustado */
+  --glass-bg: rgba(2, 6, 23, 0.4);
   --glass-bg-hover: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.05);
-  --glass-border-hover: rgba(59, 130, 246, 0.4);
-  --glass-blur: blur(16px);
-  --glass-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5);
-  --glow-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-hover: rgba(34, 197, 94, 0.6);
+  --glass-blur: blur(20px);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  --glow-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
 
-  /* Cyber Accents */
-  --color-primary: #3b82f6;
-  --color-primary-hover: #60a5fa;
-  --color-primary-glow: rgba(59, 130, 246, 0.4);
+  /* Cyber Accents Oled */
+  --color-primary: #1E293B;
+  --color-primary-hover: #334155;
+  --color-primary-glow: rgba(34, 197, 94, 0.4);
 
   --color-text: #ffffff;
   --color-text-muted: #94a3b8;
@@ -161,24 +161,88 @@ body {
   z-index: 1;
 }
 
-/* Fundos removidos — Apenas cor sólida agora. */
+/* ===== Video Backgrounds ===== */
+.global-bg-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.85; /* Blend com o bg-primary escuro */
+}
 
-/* ===== Tela de Boas-Vindas ===== */
+/* ===== Tela de Boas-Vindas (Animação de Bolha) ===== */
 .tela-boas-vindas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  z-index: 2;
+  background-color: var(--bg-primary);
   animation: fadeIn 0.8s ease;
 }
 
+.bolha-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: bubbleEnter 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.bolha-fechando {
+  animation: bubbleClose 0.6s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards !important;
+}
+
+.boas-vindas-bolha {
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.15), rgba(34, 197, 94, 0.05));
+  box-shadow: 
+    inset 0 0 40px rgba(59, 130, 246, 0.2), 
+    0 0 60px rgba(59, 130, 246, 0.1),
+    0 0 100px rgba(34, 197, 94, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+
+  /* Padrão é pulsação leve e contínua */
+  animation: bubbleFloat 4s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+.bolha-conteudo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.3s ease;
+  z-index: 2;
+}
+
+.conteudo-escondido {
+  opacity: 0;
+}
+
 .texto-boas-vindas {
-  color: var(--color-primary);
+  color: var(--color-text);
   font-size: 32px;
   font-weight: 700;
   letter-spacing: -0.02em;
   text-align: center;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
 }
 
 .subtexto-boas-vindas {
@@ -187,8 +251,20 @@ body {
   font-weight: 400;
 }
 
-.tela-boas-vindas.saindo {
-  animation: fadeOut 0.6s ease forwards;
+@keyframes bubbleFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-10px) scale(1.02); }
+}
+
+@keyframes bubbleEnter {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes bubbleClose {
+  0% { transform: scale(1); opacity: 1; filter: brightness(1); }
+  40% { transform: scale(1.1); filter: brightness(1.3); }
+  100% { transform: scale(0); opacity: 0; filter: brightness(0); }
 }
 
 /* ===== Tela de Opções ===== */
@@ -198,6 +274,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 16px;
+  width: 100%;
+  height: 100%;
+  background: rgba(2, 6, 23, 0.35); /* Película escura OLED */
+  backdrop-filter: var(--glass-blur); /* Desfoque encima do vídeo */
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 24px;
   animation: fadeInUp 0.5s ease;
 }
@@ -279,10 +360,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: rgba(2, 6, 23, 0.55); /* Um pouco mais escuro para o progresso ficar legível */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   gap: 20px;
   padding: 24px;
   animation: fadeIn 0.5s ease;
-  max-width: 90%;
 }
 
 .animacao-progresso {

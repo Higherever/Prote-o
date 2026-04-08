@@ -34,6 +34,16 @@ on_exit() {
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local dest_dir="$script_dir/logs/logBack"
     mkdir -p "$dest_dir"
+    # Mantém apenas os 10 logs mais recentes em logBack
+    local logs
+    mapfile -t logs < <(ls -1tr "$dest_dir"/instalar_*.log 2>/dev/null)
+    if [ "${#logs[@]}" -ge 10 ]; then
+        local excess=$(( ${#logs[@]} - 9 ))
+        for ((i=0; i<excess; i++)); do
+            rm -f "${logs[i]}"
+        done
+    fi
+
     local dest_file="$dest_dir/instalar_$(date '+%Y%m%d_%H%M%S').log"
     mv "$TEMP_LOG" "$dest_file"
     chmod 644 "$dest_file" 2>/dev/null || true

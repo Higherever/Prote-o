@@ -1,15 +1,8 @@
 /**
- * Welcome — Equivalente ao gui/ui/welcome.go
+ * Welcome — Fase 1 (Boas-Vindas)
  *
- * Tela de boas-vindas (Fase 1):
- * - Exibe "Bem-vindo ao Proteção" por 5 segundos
- * - Fade-out suave via CSS animation
- * - Ao terminar, chama onComplete para transição para Opções
- *
- * Configurações originais portadas:
- * - MensagemBoasVindas = "Bem-vindo ao Proteção"
- * - DuracaoBoasVindas = 5000ms
- * - PassosFadeOut = 20 (equivalente à animação CSS de ~600ms)
+ * Apresentação inicial da animação "Bubble Closing". 
+ * Após um timer, a bolha encolhe graciosamente via CSS e transiciona para a Fase 2 (Opções).
  */
 
 import { useState, useEffect } from 'react';
@@ -18,39 +11,38 @@ interface WelcomeProps {
   onComplete: () => void;
 }
 
-// Constantes — mesmas do welcome.go
-const MENSAGEM_BOAS_VINDAS = 'Bem-vindo ao Proteção';
-const DURACAO_BOAS_VINDAS = 5000; // 5 segundos
-
 export default function Welcome({ onComplete }: WelcomeProps) {
-  const [saindo, setSaindo] = useState(false);
+  const [faseAnimacao, setFaseAnimacao] = useState<'entrada' | 'fechando'>('entrada');
 
   useEffect(() => {
-    // Após 5 segundos, inicia o fade-out — equivalente a glib.TimeoutAdd
+    // Inicia o fechamento da bolha após 2.5s de apresentação
     const timer = setTimeout(() => {
-      setSaindo(true);
-    }, DURACAO_BOAS_VINDAS);
+      setFaseAnimacao('fechando');
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, []);
 
-  // Quando a animação de fade-out termina, chama o callback
-  const handleAnimationEnd = () => {
-    if (saindo) {
+  const handleAnimationEnd = (e: React.AnimationEvent) => {
+    // Apenas transiciona para a próxima fase quando a animação específica 'bubbleClose' terminar
+    if (faseAnimacao === 'fechando' && e.animationName === 'bubbleClose') {
       onComplete();
     }
   };
 
   return (
-    <div
-      className={`tela-boas-vindas ${saindo ? 'saindo' : ''}`}
-      onAnimationEnd={handleAnimationEnd}
-      id="tela-boas-vindas"
-    >
-      <h1 className="texto-boas-vindas">{MENSAGEM_BOAS_VINDAS}</h1>
-      <p className="subtexto-boas-vindas">
-        Configuração e proteção para CachyOS
-      </p>
+    <div className="tela-boas-vindas" id="tela-boas-vindas">
+      <div 
+        className={`bolha-wrapper ${faseAnimacao === 'fechando' ? 'bolha-fechando' : ''}`}
+        onAnimationEnd={handleAnimationEnd}
+      >
+        <div className="boas-vindas-bolha">
+          <div className={`bolha-conteudo ${faseAnimacao === 'fechando' ? 'conteudo-escondido' : ''}`}>
+            <h1 className="texto-boas-vindas" style={{ fontSize: '38px', marginBottom: '12px' }}>Proteção</h1>
+            <p className="subtexto-boas-vindas">Bem-vindo ao sistema de configuração</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

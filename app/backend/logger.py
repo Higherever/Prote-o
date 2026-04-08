@@ -142,10 +142,14 @@ def configurar_logs() -> logging.Logger:
     base_dir = Path(__file__).resolve().parent.parent.parent
 
     log_front_dir = base_dir / "logs" / "logFront"
+    log_back_dir = base_dir / "logs" / "logBack"
+    
     log_front_dir.mkdir(parents=True, exist_ok=True)
+    log_back_dir.mkdir(parents=True, exist_ok=True)
 
     # Remove logs mais antigos antes de criar o novo (limite = MAX_LOGS)
     _limpar_logs_antigos(log_front_dir, prefixo="app_")
+    _limpar_logs_antigos(log_back_dir, prefixo="instalar_")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_front_dir / f"app_{timestamp}.log"

@@ -2,15 +2,12 @@
  * App.tsx — Componente principal do Proteção GUI
  *
  * Gerencia o layout principal e as 3 fases da aplicação:
- * Fase 1: Boas-vindas (5 segundos + fade-out)
- * Fase 2: Opções (3 botões estilo Wibushi)
- * Fase 3: Progresso (Loading26 + status em tempo real via WebSocket)
- *
- * WebSocket conectado UMA VEZ no nível do App (não dentro de Progress)
- * para evitar conexões duplicadas no React StrictMode.
+ * Fase 1: Boas-vindas (vídeo de transição e animação)
+ * Fase 2: Opções (fundo estático Complexity e menu Glassmorphism)
+ * Fase 3: Progresso (reprodução contínua e status via WebSocket)
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import TitleBar from './components/TitleBar';
 import Welcome from './components/Welcome';
 import Options from './components/Options';
@@ -22,16 +19,28 @@ type Fase = 'boas-vindas' | 'opcoes' | 'progresso';
 export default function App() {
   const [faseAtual, setFaseAtual] = useState<Fase>('boas-vindas');
   const [funcaoEscolhida, setFuncaoEscolhida] = useState<string>('');
+  
+  // Ref para controlar play/pause do vídeo de background Global
+  const bgVideoRef = useRef<HTMLVideoElement>(null);
 
-  // WebSocket conectado UMA VEZ no nível do App — evita duplicação
   const ws = useWebSocket();
 
-  // Callback: boas-vindas finalizada → mostra opções
+  // Controla o play/pause do bg video reativamente quando a fase muda
+  useEffect(() => {
+    if (bgVideoRef.current) {
+      if (faseAtual === 'opcoes') {
+        bgVideoRef.current.currentTime = 0; // reseta ao começo
+        bgVideoRef.current.pause();
+      } else if (faseAtual === 'progresso') {
+        bgVideoRef.current.play().catch(e => console.error("Play background video error:", e));
+      }
+    }
+  }, [faseAtual]);
+
   const aoFinalizarBoasVindas = useCallback(() => {
     setFaseAtual('opcoes');
   }, []);
 
-  // Callback: opção escolhida → mostra progresso
   const aoEscolherOpcao = useCallback((funcao: string) => {
     setFuncaoEscolhida(funcao);
     setFaseAtual('progresso');
@@ -39,12 +48,21 @@ export default function App() {
 
   return (
     <div id="janela-principal">
-      {/* Barra de título personalizada — equivalente a criarBarraTitulo() */}
       <TitleBar />
 
-      {/* Container principal com overlay */}
+      {/* Global Background Video injetado por trás da interface nas fases de opção e progresso */}
+      {(faseAtual === 'opcoes' || faseAtual === 'progresso') && (
+        <video
+          ref={bgVideoRef}
+          src="./videos/loading.mp4"
+          loop
+          muted
+          playsInline
+          className="global-bg-video"
+        />
+      )}
+
       <div className="conteudo-principal">
-        {/* Container das fases */}
         <div className="container-fases">
           {faseAtual === 'boas-vindas' && (
             <Welcome onComplete={aoFinalizarBoasVindas} />
