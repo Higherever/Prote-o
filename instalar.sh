@@ -308,6 +308,11 @@ run_pacman() {
         local filtered_pkgs
         filtered_pkgs=$(resolve_known_conflicts "${args[@]}")
         read -r -a final_packages <<< "$filtered_pkgs"
+        for p in "${final_packages[@]}"; do
+            if [[ ! "$p" =~ ^- ]]; then
+                echo "###PROTEO:PKG:$p"
+            fi
+        done
     else
         final_packages=("${args[@]}")
     fi
@@ -564,6 +569,11 @@ aur_install() {
     fi
 
     # Se rodando como root (via pkexec/sudo), DEVE delegar ao usuário real
+    for p in "$@"; do
+        if [[ ! "$p" =~ ^- ]]; then
+            echo "###PROTEO:PKG:$p"
+        fi
+    done
     if [[ ${EUID} -eq 0 ]]; then
         if [[ -n "${REAL_USER:-}" ]]; then
             log_info "Delegando instalação AUR para o usuário: $REAL_USER (helper: $helper)"
@@ -608,11 +618,14 @@ instalar_seguranca() {
     echo -e "${CYAN}══════════════════════════════════════════════${NC}"
 
     echo ""
+    echo "###PROTEO:ETAPA:Atualização:1:5"
     echo -e "${YELLOW}[0/5]${NC} Atualizando sistema..."
     log_info "Executando atualização completa do sistema via pacman."
     run_pacman -Syu --noconfirm
+    echo "###PROTEO:FIM_ETAPA:Atualização"
 
     echo ""
+    echo "###PROTEO:ETAPA:Cloudflare WARP:2:5"
     echo -e "${YELLOW}[1/5]${NC} Instalando Cloudflare WARP..."
     log_info "Verificando presença do warp-cli e do serviço warp-svc."
     if ! command -v warp-cli &>/dev/null; then
@@ -667,8 +680,10 @@ instalar_seguranca() {
             return 1
         fi
     fi
+    echo "###PROTEO:FIM_ETAPA:Cloudflare WARP"
 
     echo ""
+    echo "###PROTEO:ETAPA:Kernel:3:5"
     echo -e "${YELLOW}[2/5]${NC} Hardening do kernel (compatível com jogos)..."
     log_info "Gravando parâmetros sysctl de hardening em /etc/sysctl.d/99-hardening.conf."
     write_file /etc/sysctl.d/99-hardening.conf > /dev/null << 'SYSCTL'
@@ -706,8 +721,10 @@ SYSCTL
         sudo sysctl --system > /dev/null 2>&1
     fi
     log_success "Kernel hardening aplicado com perfil compatível com jogos."
+    echo "###PROTEO:FIM_ETAPA:Kernel"
 
     echo ""
+    echo "###PROTEO:ETAPA:Firewall:4:5"
     echo -e "${YELLOW}[3/5]${NC} Configurando firewall nftables (gaming-safe)..."
     log_info "Instalando nftables e escrevendo a política de firewall."
     run_pacman -S --noconfirm --needed nftables
@@ -751,8 +768,10 @@ NFTABLES
     run_systemctl enable --now nftables
     run_nft -f /etc/nftables.conf
     log_success "Firewall ativo com regras para jogos aplicadas."
+    echo "###PROTEO:FIM_ETAPA:Firewall"
 
     echo ""
+    echo "###PROTEO:ETAPA:Fail2Ban:5:5"
     echo -e "${YELLOW}[4/5]${NC} Instalando Fail2Ban..."
     log_info "Instalando Fail2Ban e gravando jail.local."
     run_pacman -S --noconfirm --needed fail2ban
@@ -772,6 +791,7 @@ bantime = 3600
 FAIL2BAN
     run_systemctl enable --now fail2ban
     log_success "Fail2Ban ativo."
+    echo "###PROTEO:FIM_ETAPA:Fail2Ban"
 
     echo ""
     echo -e "${YELLOW}[5/5]${NC} Verificando tudo..."
@@ -789,10 +809,13 @@ instalar_jogos() {
     echo -e "${CYAN}══════════════════════════════════════════════${NC}"
 
     echo ""
+    echo "###PROTEO:ETAPA:AUR Helper:1:4"
     echo -e "${YELLOW}[1/4]${NC} Verificando AUR helper..."
     garantir_aur_helper || return 1
+    echo "###PROTEO:FIM_ETAPA:AUR Helper"
 
     echo ""
+    echo "###PROTEO:ETAPA:Drivers:2:4"
     echo -e "${YELLOW}[2/4]${NC} Instalando drivers e dependências..."
     log_info "Instalando pacotes de drivers, Vulkan, Wine e utilitários de jogos."
     run_pacman -S --noconfirm --needed \
@@ -822,8 +845,10 @@ instalar_jogos() {
         vulkan-tools \
         winetricks \
         xf86-video-amdgpu
+    echo "###PROTEO:FIM_ETAPA:Drivers"
 
     echo ""
+    echo "###PROTEO:ETAPA:Apps Oficiais:3:4"
     echo -e "${YELLOW}[3/4]${NC} Instalando aplicativos (repos oficiais)..."
     log_info "Instalando launchers e ferramentas disponíveis nos repositórios CachyOS via pacman."
     run_pacman -S --noconfirm --needed \
@@ -835,8 +860,10 @@ instalar_jogos() {
         goverlay \
         heroic-games-launcher-bin \
         vesktop
+    echo "###PROTEO:FIM_ETAPA:Apps Oficiais"
 
     echo ""
+    echo "###PROTEO:ETAPA:Apps AUR:4:4"
     echo -e "${YELLOW}[4/4]${NC} Instalando aplicativos (AUR)..."
     log_info "Instalando pacotes exclusivos do AUR via helper."
     # Apenas pacotes que NÃO estão nos repositórios oficiais do CachyOS
@@ -848,6 +875,7 @@ instalar_jogos() {
         log_warn "Você pode instalá-los manualmente após o script finalizar."
         # Não retorna erro fatal — os pacotes AUR são complementares
     fi
+    echo "###PROTEO:FIM_ETAPA:Apps AUR"
 
     echo ""
     log_success "Instalação de ferramentas e dependências para jogos concluída."

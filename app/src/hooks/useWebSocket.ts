@@ -2,7 +2,18 @@
  * useWebSocket — Hook personalizado para gerenciar conexão WebSocket
  *
  * Conecta ao backend Python em ws://127.0.0.1:8000/ws/progresso
- * e recebe linhas de output do script em tempo real.
+ * e recebe eventos estruturados do script em tempo real.
+ *
+ * Tipos de evento suportados:
+ * - output        : linha de log bruta do script
+ * - etapa         : início de uma etapa de instalação
+ * - pacote        : um pacote está sendo processado
+ * - fim_etapa     : uma etapa concluiu
+ * - velocidade    : medição de velocidade de download
+ * - timeout_warning : o watchdog detectou silêncio prolongado
+ * - cancelado     : a execução foi cancelada pelo usuário
+ * - finalizado    : a execução terminou (com sucesso, erro ou cancelamento)
+ * - pong / status : respostas a heartbeat e consulta de estado
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -10,11 +21,49 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 const WS_BASE = 'ws://127.0.0.1:8000';
 
 export interface WSMessage {
-  tipo: 'output' | 'finalizado' | 'pong' | 'status';
+  tipo:
+    | 'output'
+    | 'etapa'
+    | 'pacote'
+    | 'fim_etapa'
+    | 'velocidade'
+    | 'timeout_warning'
+    | 'cancelado'
+    | 'finalizado'
+    | 'pong'
+    | 'status';
+  /* output */
   dados?: string;
+  /* etapa */
+  etapa?: string;
+  numero?: number;
+  total?: number;
+  tempo_inicio?: number;
+  /* pacote */
+  pacote?: string;
+  /* velocidade */
+  bytes_por_segundo?: number;
+  kbps?: number;
+  /* timeout_warning */
+  segundos_sem_resposta?: number;
+  timeout_configurado?: number;
+  /* finalizado */
   sucesso?: boolean;
   erro?: string | null;
+  cancelado?: boolean;
+  /* status */
   executando?: boolean;
+}
+
+/** Status possível de um pacote na lista visual */
+export type StatusPacote = 'aguardando' | 'instalando' | 'concluido' | 'erro';
+
+/** Dados de um pacote rastreado pela UI */
+export interface PacoteInfo {
+  nome: string;
+  status: StatusPacote;
+  tempoInicio?: number;
+  tempoFim?: number;
 }
 
 export function useWebSocket() {

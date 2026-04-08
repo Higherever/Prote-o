@@ -19,6 +19,7 @@ type Fase = 'boas-vindas' | 'opcoes' | 'progresso';
 export default function App() {
   const [faseAtual, setFaseAtual] = useState<Fase>('boas-vindas');
   const [funcaoEscolhida, setFuncaoEscolhida] = useState<string>('');
+  const [transicaoSaida, setTransicaoSaida] = useState(false);
   
   // Ref para controlar play/pause do vídeo de background Global
   const bgVideoRef = useRef<HTMLVideoElement>(null);
@@ -46,6 +47,15 @@ export default function App() {
     setFaseAtual('progresso');
   }, []);
 
+  const aoRetornar = useCallback(() => {
+    setTransicaoSaida(true);
+    setTimeout(() => {
+      ws.clearMessages();
+      setFaseAtual('opcoes');
+      setTransicaoSaida(false);
+    }, 500); // duração da animação fadeOutDown
+  }, [ws]);
+
   return (
     <div id="janela-principal">
       <TitleBar />
@@ -70,8 +80,15 @@ export default function App() {
           {faseAtual === 'opcoes' && (
             <Options onSelect={aoEscolherOpcao} />
           )}
-          {faseAtual === 'progresso' && (
-            <Progress funcao={funcaoEscolhida} ws={ws} />
+          {/* BUG-05: mantém Progress no DOM durante transiciãoSaida para a animação
+              fadeOutDown ser renderizada antes do componente ser desmontado */}
+          {(faseAtual === 'progresso' || transicaoSaida) && (
+            <Progress
+              funcao={funcaoEscolhida}
+              ws={ws}
+              onBack={aoRetornar}
+              saindo={transicaoSaida}
+            />
           )}
         </div>
       </div>

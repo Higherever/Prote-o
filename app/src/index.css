@@ -359,15 +359,20 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
   height: 100%;
-  background: rgba(2, 6, 23, 0.55); /* Um pouco mais escuro para o progresso ficar legível */
+  background: rgba(2, 6, 23, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  gap: 20px;
+  gap: 14px;
   padding: 24px;
   animation: fadeIn 0.5s ease;
+  overflow-y: auto;
+}
+
+.tela-progresso.saindo {
+  animation: fadeOutDown 0.5s ease forwards;
 }
 
 .animacao-progresso {
@@ -394,19 +399,198 @@ body {
   text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
 }
 
-/* Log container para saída do script (Terminal Feeling Premium) */
+.texto-progresso.cancelado {
+  color: #f59e0b;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.texto-velocidade {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.texto-erro-detalhe {
+  color: var(--color-error);
+  font-size: 12px;
+  text-align: center;
+  max-width: 500px;
+}
+
+/* ===== Progress Header (Barra de Progresso por Etapa) ===== */
+.progress-header {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeInUp 0.4s ease;
+}
+
+.progress-header-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-etapa-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.progress-etapa-nome {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  text-align: center;
+}
+
+.progress-etapa-timer {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+.barra-progresso-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+}
+
+.barra-progresso-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #3b82f6, #8b5cf6);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.progress-porcentagem {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-align: right;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== Package List ===== */
+.package-list {
+  width: 100%;
+  max-width: 520px;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.package-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.package-list::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 2px;
+}
+
+.package-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  animation: fadeInUp 0.3s ease both;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.package-instalando {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.package-concluido {
+  opacity: 0.7;
+}
+
+.package-erro {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.package-icon {
+  font-size: 14px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.package-nome {
+  color: var(--color-text);
+  font-weight: 500;
+  flex: 1;
+}
+
+.package-tempo {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* ===== Log Toggle + Container ===== */
+.log-toggle-wrapper {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.log-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-family);
+  font-size: 13px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.log-toggle-btn:hover {
+  color: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .log-container {
   width: 100%;
-  max-width: 600px;
-  max-height: 200px;
+  max-height: 180px;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.3);
   border-radius: var(--radius-sm);
-  padding: 16px;
+  padding: 12px 16px;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.3s ease;
 }
 
 .log-container::-webkit-scrollbar {
@@ -424,11 +608,102 @@ body {
 
 .log-linha {
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.7;
   color: #a1a1aa;
   word-break: break-all;
   letter-spacing: 0.02em;
+}
+
+/* ===== Progress Footer ===== */
+.progress-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.progress-tempo-total {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* ===== Botão Cancelar ===== */
+.btn-cancelar {
+  --glass-border-hover: rgba(239, 68, 68, 0.6);
+  --glow-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+  min-width: 240px;
+}
+
+.btn-cancelar:hover {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: var(--glass-shadow), 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+/* ===== Modal Overlay & Confirmação ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-confirmacao {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: var(--glass-shadow);
+  animation: fadeInUp 0.3s ease;
+}
+
+.modal-texto {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.modal-botoes {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.modal-botoes .btn-opcao {
+  min-width: 160px;
+  min-height: 44px;
+  font-size: 14px;
+  padding: 12px 24px;
+}
+
+.btn-confirmar-cancelar {
+  --glass-border-hover: rgba(239, 68, 68, 0.6);
+}
+
+.btn-confirmar-cancelar:hover {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: var(--glass-shadow), 0 0 20px rgba(239, 68, 68, 0.2);
+}
+
+.btn-continuar:hover {
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: var(--glass-shadow), 0 0 20px rgba(34, 197, 94, 0.2);
 }
 
 /* Spinner de loading */
@@ -471,6 +746,18 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(16px);
   }
 }
 

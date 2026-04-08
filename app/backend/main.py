@@ -2,9 +2,11 @@
 Servidor Backend — Equivalente ao gui/main.go
 
 FastAPI com:
-- POST /api/executar  — inicia execução de uma função do script
-- GET  /api/health    — health check para o Electron
-- WS   /ws/progresso  — streaming de logs em tempo real
+- POST /api/executar   — inicia execução de uma função do script
+- POST /api/cancelar   — cancela a execução em andamento
+- GET  /api/health     — health check para o Electron
+- GET  /api/velocidade — retorna a velocidade de download medida
+- WS   /ws/progresso   — streaming de logs em tempo real
 
 O frontend React roda no Electron e se conecta aqui via HTTP/WebSocket.
 """
@@ -21,7 +23,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from logger import configurar_logs
-from runner import executar_funcao, esta_executando, obter_erro
+from runner import (
+    executar_funcao, esta_executando, obter_erro,
+    cancelar_execucao, foi_cancelado,
+    medir_velocidade, obter_velocidade,
+)
 
 # Configura logs acumulativos — primeiro passo da inicialização
 log = configurar_logs()
@@ -66,10 +72,10 @@ async def api_executar(cmd: ComandoExecutar):
         return {"status": "erro", "mensagem": "Já existe um script em execução"}
 
     # Callback para enviar output via WebSocket
-    async def broadcast_output(line: str):
+    async def broadcast_output(msg: dict):
         for ws in ws_connections[:]:
             try:
-                await ws.send_json({"tipo": "output", "dados": line})
+                await ws.send_json(msg)
             except Exception:
                 if ws in ws_connections:
                     ws_connections.remove(ws)
@@ -80,19 +86,58 @@ async def api_executar(cmd: ComandoExecutar):
     return {"status": "ok", "mensagem": f"Execução de {cmd.funcao} iniciada"}
 
 
+@app.post("/api/cancelar")
+async def api_cancelar():
+    """Cancela a execução atual, se houver."""
+    log.info("[API] POST /api/cancelar recebido")
+    if not esta_executando():
+        return {"status": "erro", "mensagem": "Nenhuma execução em andamento"}
+
+    # BUG-09: Não faz broadcast aqui para evitar evento duplicado.
+    # O _executar_e_notificar() já envia {"tipo": "finalizado", "cancelado": true}
+    # quando o processo terminar, o que é o evento canônico.
+    await cancelar_execucao()
+
+    return {"status": "ok", "mensagem": "Cancelamento solicitado"}
+
+
+@app.get("/api/velocidade")
+async def api_velocidade():
+    """Retorna a última velocidade de download medida (bytes/s)."""
+    velocidade = obter_velocidade()
+    return {
+        "velocidade_bytes_s": velocidade,
+        "velocidade_kbps": round(velocidade / 1024, 1),
+        "velocidade_mbps": round(velocidade / (1024 * 1024), 2),
+    }
+
+
+
+
 async def _executar_e_notificar(funcao: str, broadcast):
-    """Wrapper que executa a função e notifica via WebSocket ao final."""
+    """Wrapper que mede a velocidade, executa a função e notifica via WebSocket."""
+    # Mede velocidade de download antes de iniciar a instalação
+    velocidade = await medir_velocidade()
+    await broadcast({
+        "tipo": "velocidade",
+        "bytes_por_segundo": velocidade,
+        "kbps": round(velocidade / 1024, 1),
+    })
+
     await executar_funcao(funcao, on_output=broadcast)
 
     # Notifica finalização para todos os WebSockets conectados
     erro = obter_erro()
+    cancelado = foi_cancelado()
+
     for ws in ws_connections[:]:
         try:
             await ws.send_json(
                 {
                     "tipo": "finalizado",
-                    "sucesso": erro is None,
+                    "sucesso": erro is None and not cancelado,
                     "erro": erro,
+                    "cancelado": cancelado
                 }
             )
         except Exception:
